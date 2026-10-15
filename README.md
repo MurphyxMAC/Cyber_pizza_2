@@ -7,7 +7,7 @@ This is a from-scratch Phase 0 + Phase 1 build: Foundry contracts, Supabase-comp
 ## Layout
 
 ```
-apps/web                 Next.js 15 booth (SIWE, game API, Fuji wallet)
+apps/web                 Next.js 15 street + booth (marketing at /, kitchen at /play)
 packages/shared          Ingredient rules, EIP-712 types, ABIs, Fuji addresses
 contracts                CPTToken, PizzaRewards, Forge tests, Fuji deploy script
 supabase/migrations      users, inventory, recipes, claims, actions_log, claim function
@@ -91,7 +91,7 @@ openssl rand -base64 32
 pnpm install
 docker compose up -d          # Postgres on localhost:54322
 pnpm db:migrate
-pnpm dev                      # http://127.0.0.1:41731
+pnpm dev                      # street http://127.0.0.1:41731 · kitchen /play
 ```
 
 Without Docker, create a database and set `DATABASE_URL` yourself, then `pnpm db:migrate`.
@@ -104,7 +104,7 @@ On Supabase:
 
 The kitchen page loads without a database. Collect, bake, and claim return a clear error until `DATABASE_URL` is set and the migration has been applied.
 
-`pnpm dev` serves the web app on port **41731**.
+`pnpm dev` serves the web app on port **41731**. `/` is the street (marketing). `/play` is the kitchen.
 
 ## Contracts
 
@@ -144,7 +144,7 @@ The owner can later call `setSigner`, `setDailyMintCap`, `pause`, and `unpause`.
 
 ## End-to-end on Fuji
 
-1. `pnpm dev` and open `http://127.0.0.1:41731`.
+1. `pnpm dev` and open `http://127.0.0.1:41731/play`. The street is `http://127.0.0.1:41731`.
 2. Connect Core or MetaMask and switch to Avalanche Fuji.
 3. **Sign the booth slip.** That is SIWE. It does not send a transaction. The httpOnly cookie stores the address. Game routes ignore any address in the body.
 4. Collect all nine toppings. The slowest tray is cyberbacon at 90 seconds, so the first pie takes about that long if you start from empty. Each collect is one topping, capped, and cooldown-gated on the server.
@@ -153,6 +153,17 @@ The owner can later call `setSigner`, `setDailyMintCap`, `pause`, and `unpause`.
 7. Wallet CPT balance on the pass should show 10.
 
 If the mint button says contracts are not deployed, the public addresses are still the zero address.
+
+## Deploy on Vercel
+
+The street and the kitchen are one Next.js app.
+
+1. Import this repository.
+2. Set the project **Root Directory** to `apps/web`.
+3. Leave the framework preset on Next.js. `apps/web/vercel.json` installs with `pnpm install --filter @cyberpizza/web...`, which pulls that app and its workspace packages. `outputFileTracingRoot` in `apps/web/next.config.ts` points file tracing at the repo root.
+4. Add the web keys from `.env.example`. The street renders without them. Collect, bake, and claim need `DATABASE_URL`, `SESSION_SECRET`, and, for minting, a signer key plus deployed Fuji addresses.
+
+CI uses Node.js 22. The root `package.json` `engines` field asks for Node 22 or newer.
 
 ## Checks
 
