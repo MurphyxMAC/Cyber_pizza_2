@@ -1,4 +1,14 @@
-export function PizzaMark({ className = "size-56" }: { className?: string }) {
+export function PizzaMark({
+  className = "size-56",
+  idPrefix = "pie",
+}: {
+  className?: string;
+  idPrefix?: string;
+}) {
+  const crust = `${idPrefix}-crust`;
+  const sauce = `${idPrefix}-sauce`;
+  const glow = `${idPrefix}-glow`;
+
   return (
     <svg
       viewBox="0 0 240 240"
@@ -7,16 +17,16 @@ export function PizzaMark({ className = "size-56" }: { className?: string }) {
       aria-label="Neon supreme pizza"
     >
       <defs>
-        <radialGradient id="crust" cx="50%" cy="45%" r="55%">
+        <radialGradient id={crust} cx="50%" cy="45%" r="55%">
           <stop offset="0%" stopColor="#f2c27a" />
           <stop offset="70%" stopColor="#c9843a" />
           <stop offset="100%" stopColor="#8a4b1f" />
         </radialGradient>
-        <radialGradient id="sauce" cx="50%" cy="50%" r="50%">
+        <radialGradient id={sauce} cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#ff5a4a" />
           <stop offset="100%" stopColor="#9d1c3a" />
         </radialGradient>
-        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+        <filter id={glow} x="-20%" y="-20%" width="140%" height="140%">
           <feGaussianBlur stdDeviation="3" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
@@ -24,10 +34,10 @@ export function PizzaMark({ className = "size-56" }: { className?: string }) {
           </feMerge>
         </filter>
       </defs>
-      <circle cx="120" cy="120" r="108" fill="url(#crust)" />
-      <circle cx="120" cy="120" r="86" fill="url(#sauce)" />
+      <circle cx="120" cy="120" r="108" fill={`url(#${crust})`} />
+      <circle cx="120" cy="120" r="86" fill={`url(#${sauce})`} />
       <circle cx="120" cy="120" r="78" fill="#ffd56a" opacity="0.92" />
-      <g filter="url(#glow)">
+      <g filter={`url(#${glow})`}>
         <circle cx="92" cy="96" r="14" fill="#ff3b30" />
         <circle cx="146" cy="88" r="12" fill="#ff3b30" />
         <circle cx="128" cy="140" r="13" fill="#ff3b30" />

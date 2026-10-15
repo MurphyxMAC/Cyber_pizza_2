@@ -1,6 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Chakra_Petch, IBM_Plex_Mono } from "next/font/google";
-import { Providers } from "./providers";
 import "./globals.css";
 
 const display = Chakra_Petch({
@@ -16,9 +15,24 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CyberPizza",
+  title: {
+    default: "CyberPizza",
+    template: "%s · CyberPizza",
+  },
   description:
-    "Night-shift pizza kitchen on Avalanche Fuji. Collect nine toppings, bake a Neon Supreme, and claim CPT.",
+    "Night-shift pizza kitchen on the Avalanche Fuji testnet. Collect nine toppings, bake a Neon Supreme for 10 pending CPT, and claim it as testnet CPT.",
+  openGraph: {
+    title: "CyberPizza",
+    description:
+      "Night-shift pizza kitchen on the Avalanche Fuji testnet. Collect nine toppings, bake a Neon Supreme, and claim testnet CPT.",
+    type: "website",
+    locale: "en_US",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1b1422",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({
@@ -28,9 +42,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`dark ${display.variable} ${mono.variable}`}>
-      <body className="antialiased">
-        <Providers>{children}</Providers>
-      </body>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }

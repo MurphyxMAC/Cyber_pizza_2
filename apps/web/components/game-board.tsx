@@ -17,6 +17,7 @@ import {
 } from "@cyberpizza/shared";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createSiweMessage } from "viem/siwe";
 import { formatUnits, isAddressEqual, type Address } from "viem";
@@ -288,7 +289,13 @@ export function GameBoard() {
     <div className="relative z-10 min-h-screen">
       <header className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-5 sm:px-6 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="font-mono text-[11px] tracking-[0.32em] text-accent">AVALANCHE FUJI · 43113</p>
+          <p className="font-mono text-[11px] tracking-[0.32em] text-accent">
+            <Link href="/" className="hover:underline focus-visible:underline">
+              STREET
+            </Link>
+            <span aria-hidden> · </span>
+            AVALANCHE FUJI · 43113
+          </p>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">CyberPizza</h1>
           <p className="max-w-xl text-sm text-muted-foreground">
             Night-shift kitchen. Scrape toppings, bake one neon pie, mint the CPT.

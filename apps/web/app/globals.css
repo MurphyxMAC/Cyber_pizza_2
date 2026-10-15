@@ -160,3 +160,123 @@ body::after {
     0 0 0 1px oklch(0.7 0.12 330 / 18%),
     0 20px 60px oklch(0 0 0 / 35%);
 }
+
+html {
+  scroll-behavior: smooth;
+}
+
+::selection {
+  background: oklch(0.68 0.23 350 / 55%);
+  color: oklch(0.98 0.01 85);
+}
+
+@keyframes site-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes site-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes site-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes site-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.site-float {
+  animation: site-float 7s ease-in-out infinite;
+}
+
+.site-spin {
+  animation: site-spin 42s linear infinite;
+}
+
+.site-spin-reverse {
+  animation: site-spin 58s linear infinite reverse;
+}
+
+.site-pulse {
+  animation: site-pulse 2.6s ease-in-out infinite;
+}
+
+.site-marquee {
+  width: max-content;
+  animation: site-marquee 48s linear infinite;
+}
+
+.site-card {
+  transition: transform 180ms ease;
+}
+
+.site-card:hover {
+  transform: translateY(-3px);
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: 0.75rem;
+  z-index: 60;
+  transform: translateY(-160%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .site-float,
+  .site-spin,
+  .site-spin-reverse,
+  .site-pulse,
+  .site-marquee {
+    animation: none;
+  }
+
+  .site-marquee {
+    width: auto;
+    flex-wrap: wrap;
+  }
+
+  .site-marquee > div {
+    flex-wrap: wrap;
+    width: 100%;
+    white-space: normal;
+  }
+
+  .site-marquee-clone {
+    display: none;
+  }
+
+  .site-card,
+  .site-card:hover {
+    transform: none;
+    transition: none;
+  }
+}
