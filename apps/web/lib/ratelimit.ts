@@ -114,3 +114,4 @@ export const stateLimiter = createRateLimiter({ limit: 60, windowMs: 60_000, pre
 export const collectLimiter = createRateLimiter({ limit: 40, windowMs: 60_000, prefix: "collect" });
 export const bakeLimiter = createRateLimiter({ limit: 15, windowMs: 60_000, prefix: "bake" });
 export const claimLimiter = createRateLimiter({ limit: 10, windowMs: 60_000, prefix: "claim" });
+export const upgradeLimiter = createRateLimiter({ limit: 20, windowMs: 60_000, prefix: "upgrade" });

@@ -5,15 +5,26 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PizzaMark } from "@/components/pizza-mark";
 import { wagmiConfig } from "@/app/providers";
+import { RecipeMenu } from "@/components/recipe-menu";
+import { UpgradeShop } from "@/components/upgrade-shop";
 import {
+  cooldownAtLevel,
   cptTokenAbi,
   FUJI_CHAIN_ID,
   INGREDIENTS,
+  ingredientIndex,
   pizzaRewardsAbi,
+  projectRecipe,
+  RECIPES,
+  resolveAddresses,
   SIWE_STATEMENT,
+  UPGRADE_MAX_LEVEL,
+  upgradePriceCpt,
+  upgradesAbi,
   type ClaimPayload,
   type GameState,
   type IngredientState,
+  type RecipeState,
 } from "@cyberpizza/shared";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -29,23 +40,38 @@ import {
   useSwitchChain,
   useWriteContract,
 } from "wagmi";
-import { waitForTransactionReceipt } from "wagmi/actions";
+import { readContract, waitForTransactionReceipt } from "wagmi/actions";
 
 type SessionResponse = { address: string | null };
 type ClaimResponse = { claim: ClaimPayload; state: GameState };
 
-const previewInventory: IngredientState[] = INGREDIENTS.map((ingredient) => ({
-  id: ingredient.id,
-  name: ingredient.name,
-  blurb: ingredient.blurb,
-  accent: ingredient.accent,
-  amount: 0,
-  cap: ingredient.cap,
-  cooldownSeconds: ingredient.cooldownSeconds,
-  lastCollectedAt: null,
-  readyAt: null,
-  ready: false,
-}));
+const fallbackContracts = resolveAddresses({
+  cptToken: process.env.NEXT_PUBLIC_CPT_TOKEN_ADDRESS,
+  pizzaRewards: process.env.NEXT_PUBLIC_PIZZA_REWARDS_ADDRESS,
+  upgrades: process.env.NEXT_PUBLIC_UPGRADES_ADDRESS,
+});
+
+const previewInventory: IngredientState[] = INGREDIENTS.map((ingredient) => {
+  const price = upgradePriceCpt(ingredient.id, 0);
+  return {
+    id: ingredient.id,
+    name: ingredient.name,
+    blurb: ingredient.blurb,
+    accent: ingredient.accent,
+    amount: 0,
+    cap: ingredient.cap,
+    cooldownSeconds: ingredient.cooldownSeconds,
+    baseCooldownSeconds: ingredient.cooldownSeconds,
+    upgradeLevel: 0,
+    nextCooldownSeconds: cooldownAtLevel(ingredient.cooldownSeconds, 1),
+    upgradePriceCpt: price === null ? null : String(price),
+    lastCollectedAt: null,
+    readyAt: null,
+    ready: false,
+  };
+});
+
+const previewRecipes: RecipeState[] = RECIPES.map((recipe) => projectRecipe(recipe));
 
 async function readJson<T>(response: Response): Promise<T> {
   const body = (await response.json().catch(() => ({}))) as { message?: string } & T;
@@ -143,17 +169,33 @@ export function GameBoard() {
   const state = stateQuery.data ?? null;
   const now = useKitchenNow(state?.serverNow);
   const inventory = state?.inventory ?? previewInventory;
+  const recipes = state?.recipes ?? previewRecipes;
+  const contracts = state?.contracts ?? {
+    deployed: fallbackContracts.deployed,
+    cptToken: fallbackContracts.cptToken,
+    pizzaRewards: fallbackContracts.pizzaRewards,
+    upgrades: fallbackContracts.upgrades,
+    upgradesDeployed: fallbackContracts.upgradesDeployed,
+  };
   const walletMatches =
     Boolean(sessionAddress && address) &&
     isAddressEqual(sessionAddress as Address, address as Address);
   const onFuji = chainId === FUJI_CHAIN_ID;
 
   const balance = useReadContract({
-    address: state?.contracts.deployed ? (state.contracts.cptToken as Address) : undefined,
+    address: contracts.deployed ? (contracts.cptToken as Address) : undefined,
     abi: cptTokenAbi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
-    query: { enabled: Boolean(state?.contracts.deployed && address) },
+    query: { enabled: Boolean(contracts.deployed && address) },
+  });
+
+  const allowance = useReadContract({
+    address: contracts.upgradesDeployed ? (contracts.cptToken as Address) : undefined,
+    abi: cptTokenAbi,
+    functionName: "allowance",
+    args: address ? [address, contracts.upgrades as Address] : undefined,
+    query: { enabled: Boolean(contracts.upgradesDeployed && address) },
   });
 
   async function refresh() {
@@ -223,14 +265,101 @@ export function GameBoard() {
     }
   }
 
-  async function bake() {
-    setBusy("bake");
+  async function bake(recipeId: string) {
+    setBusy(`bake:${recipeId}`);
     setBanner(null);
     try {
-      await api<GameState>("/api/game/make-pizza", { method: "POST" });
+      await api<GameState>("/api/game/make-pizza", {
+        method: "POST",
+        body: JSON.stringify({ recipeId }),
+      });
       await stateQuery.refetch();
     } catch (error) {
       setBanner(readableError(error, "The oven refused that pie."));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function buyUpgrade(id: IngredientState["id"]) {
+    if (!address || !walletMatches) {
+      setBanner("Connect the same wallet you signed in with to buy an upgrade.");
+      return;
+    }
+    if (!contracts.upgradesDeployed) {
+      setBanner("The upgrades contract is not deployed on Fuji yet.");
+      return;
+    }
+    setBusy(`upgrade:${id}`);
+    setBanner(null);
+    try {
+      if (!onFuji) {
+        await switchChainAsync({ chainId: FUJI_CHAIN_ID });
+      }
+      const index = ingredientIndex(id);
+      const upgradesAddress = contracts.upgrades as Address;
+      const tokenAddress = contracts.cptToken as Address;
+      const current = await readContract(wagmiConfig, {
+        address: upgradesAddress,
+        abi: upgradesAbi,
+        functionName: "level",
+        args: [address, index],
+        chainId: FUJI_CHAIN_ID,
+      });
+      if (Number(current) >= UPGRADE_MAX_LEVEL) {
+        setBanner("That topping is already at max level.");
+        await api<GameState>("/api/game/upgrades/refresh", { method: "POST" });
+        await stateQuery.refetch();
+        return;
+      }
+      const price = await readContract(wagmiConfig, {
+        address: upgradesAddress,
+        abi: upgradesAbi,
+        functionName: "priceOf",
+        args: [index, current],
+        chainId: FUJI_CHAIN_ID,
+      });
+      const approved = await readContract(wagmiConfig, {
+        address: tokenAddress,
+        abi: cptTokenAbi,
+        functionName: "allowance",
+        args: [address, upgradesAddress],
+        chainId: FUJI_CHAIN_ID,
+      });
+      if (approved < price) {
+        setBusy(`upgrade:${id}:approve`);
+        const approveHash = await writeContractAsync({
+          address: tokenAddress,
+          abi: cptTokenAbi,
+          functionName: "approve",
+          args: [upgradesAddress, price],
+          chainId: FUJI_CHAIN_ID,
+        });
+        await waitForTransactionReceipt(wagmiConfig, { hash: approveHash });
+      }
+      setBusy(`upgrade:${id}:buy`);
+      const hash = await writeContractAsync({
+        address: upgradesAddress,
+        abi: upgradesAbi,
+        functionName: "purchase",
+        args: [index],
+        chainId: FUJI_CHAIN_ID,
+      });
+      await waitForTransactionReceipt(wagmiConfig, { hash });
+      try {
+        await api<GameState>("/api/game/upgrades/refresh", { method: "POST" });
+      } catch (error) {
+        setBanner(
+          readableError(
+            error,
+            "The upgrade landed on Fuji. This booth will show the shorter cooldown within 15 seconds.",
+          ),
+        );
+      }
+      await Promise.all([stateQuery.refetch(), balance.refetch(), allowance.refetch()]);
+    } catch (error) {
+      setBanner(readableError(error, "Upgrade failed."));
+      await stateQuery.refetch();
     } finally {
       setBusy(null);
     }
@@ -298,7 +427,7 @@ export function GameBoard() {
           </p>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">CyberPizza</h1>
           <p className="max-w-xl text-sm text-muted-foreground">
-            Night-shift kitchen. Scrape toppings, bake one neon pie, mint the CPT.
+            Night-shift kitchen. Scrape toppings, bake from the menu, spend CPT to cool trays faster.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -321,7 +450,7 @@ export function GameBoard() {
           {[
             ["01", "Connect", "A wallet on Avalanche Fuji. Testnet AVAX pays the mint."],
             ["02", "Sign the slip", "SIWE opens your shift. The signature does not spend gas."],
-            ["03", "Bake and claim", "One of each topping makes a pie worth 10 pending CPT."],
+            ["03", "Bake and claim", "Pick a recipe. Pending CPT is the menu price, then you mint it."],
           ].map(([step, title, copy]) => (
             <li key={step} className="stall-panel rounded-2xl px-4 py-3">
               <p className="font-mono text-[11px] text-accent">{step}</p>
@@ -349,7 +478,7 @@ export function GameBoard() {
           <div className="stall-panel flex flex-col items-center justify-center rounded-3xl p-6">
             <PizzaMark className="size-52 sm:size-60" />
             <p className="mt-4 text-center font-mono text-xs tracking-wide text-muted-foreground">
-              Neon Supreme · nine toppings · +10 CPT
+              {RECIPES.length} recipes · Neon Supreme still pays 10 CPT
             </p>
           </div>
 
@@ -417,22 +546,14 @@ export function GameBoard() {
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Button
                       type="button"
-                      className="h-11 px-4"
-                      disabled={!state?.recipe.canBake || busy !== null}
-                      onClick={() => void bake()}
-                    >
-                      {busy === "bake" ? "Baking…" : `Bake ${state?.recipe.name ?? "Neon Supreme"}`}
-                    </Button>
-                    <Button
-                      type="button"
                       variant="secondary"
                       className="h-11 px-4"
                       disabled={
-                      !canClaim ||
-                      busy !== null ||
-                      !state?.contracts.deployed ||
-                      (Boolean(address) && !walletMatches)
-                    }
+                        !canClaim ||
+                        busy !== null ||
+                        !state?.contracts.deployed ||
+                        (Boolean(address) && !walletMatches)
+                      }
                       onClick={() => void claim()}
                     >
                       {busy === "claim" ? "Minting…" : claimLabel}
@@ -441,21 +562,25 @@ export function GameBoard() {
                       Refresh
                     </Button>
                   </div>
-                  {state && !state.recipe.canBake ? (
-                    <p className="text-sm text-muted-foreground">
-                      Still missing {state.recipe.missing.join(", ") || "toppings"}.
-                    </p>
-                  ) : null}
                 </>
               )}
             </CardContent>
           </Card>
         </section>
 
+        <RecipeMenu
+          recipes={recipes}
+          signedIn={Boolean(sessionAddress)}
+          busy={busy}
+          onBake={(recipeId) => void bake(recipeId)}
+        />
+
         <section>
-          <div className="mb-3 flex items-end justify-between gap-3">
+          <div className="mb-3 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
             <h2 className="text-xl font-semibold">Topping trays</h2>
-            <p className="font-mono text-xs text-muted-foreground">Server cooldown · hard cap</p>
+            <p className="font-mono text-xs text-pretty text-muted-foreground md:text-right">
+              Server cooldown · hard cap
+            </p>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {inventory.map((item) => {
@@ -486,6 +611,7 @@ export function GameBoard() {
                       </p>
                       <p className="font-mono text-xs text-muted-foreground" aria-live="polite">
                         {label}
+                        {live && item.upgradeLevel > 0 ? ` · L${item.upgradeLevel} · ${item.cooldownSeconds}s` : ""}
                       </p>
                     </div>
                     <Button
@@ -502,6 +628,16 @@ export function GameBoard() {
             })}
           </div>
         </section>
+
+        <UpgradeShop
+          inventory={inventory}
+          signedIn={Boolean(sessionAddress)}
+          canBuy={Boolean(sessionAddress) && walletMatches && contracts.upgradesDeployed}
+          deployed={contracts.upgradesDeployed}
+          allowance={allowance.data}
+          busy={busy}
+          onBuy={(id) => void buyUpgrade(id)}
+        />
       </main>
     </div>
   );

@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Kitchen",
   description:
-    "Clock in on the Avalanche Fuji testnet, collect nine toppings, bake a Neon Supreme, and claim CPT.",
+    "Clock in on the Avalanche Fuji testnet, collect toppings, bake a recipe, and claim CPT.",
 };
 
 export default function PlayPage() {

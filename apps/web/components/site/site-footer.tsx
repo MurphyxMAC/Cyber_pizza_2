@@ -1,5 +1,5 @@
 import { DISCORD_URL, GITHUB_URL } from "@/lib/site";
-import { FUJI_CHAIN_ID, RECIPE_ID } from "@cyberpizza/shared";
+import { FUJI_CHAIN_ID, RECIPES } from "@cyberpizza/shared";
 import Link from "next/link";
 
 const footerLink =
@@ -39,7 +39,7 @@ export function SiteFooter() {
       </div>
       <div className="mx-auto max-w-6xl px-4 pb-8 sm:px-6">
         <p className="font-mono text-xs tracking-wide text-muted-foreground">
-          Chain {FUJI_CHAIN_ID} · recipe {RECIPE_ID}
+          Chain {FUJI_CHAIN_ID} · {RECIPES.length} recipes
         </p>
       </div>
     </footer>

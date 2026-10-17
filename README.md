@@ -1,6 +1,6 @@
 # CyberPizza v2
 
-Night-shift pizza kitchen on Avalanche Fuji (chain id **43113**). Connect a wallet, sign in with SIWE, collect nine toppings, bake a Neon Supreme for **10 pending CPT**, then claim that balance on-chain as ERC-20 CPT.
+Night-shift pizza kitchen on Avalanche Fuji (chain id **43113**). Connect a wallet, sign in with SIWE, collect nine toppings, bake a recipe from the menu for pending CPT, then claim that balance on-chain as ERC-20 CPT. CPT also buys per-topping cooldown upgrades.
 
 This is a from-scratch Phase 0 + Phase 1 build: Foundry contracts, Supabase-compatible Postgres, and a Next.js booth. The old CyberPizza repo is inspiration only. Nothing was copied from it.
 
@@ -9,7 +9,7 @@ This is a from-scratch Phase 0 + Phase 1 build: Foundry contracts, Supabase-comp
 ```
 apps/web                 Next.js 15 street + booth (marketing at /, kitchen at /play)
 packages/shared          Ingredient rules, EIP-712 types, ABIs, Fuji addresses
-contracts                CPTToken, PizzaRewards, Forge tests, Fuji deploy script
+contracts                CPTToken, PizzaRewards, Upgrades, Forge tests, Fuji deploy script
 supabase/migrations      users, inventory, recipes, claims, actions_log, claim function
 ```
 
@@ -29,7 +29,36 @@ Topping ids, cooldowns, and caps live in `packages/shared/src/constants.ts`. The
 | nanopeppers | 75s | 6 |
 | cyberbacon | 90s | 6 |
 
-Baking consumes **1 of each** and adds **10** pending CPT. A claim locks the user row, writes a pending claim for the full pending balance, zeroes pending CPT, and bumps `claim_nonce` in one transaction. The server then signs:
+Recipes live in `packages/shared/src/constants.ts` and are seeded into `recipes`. The bake route accepts a recipe id only. Postgres reads that row's quantity map and CPT reward. The client cannot choose either number. Cost used to set the reward is the sum of `quantity × base cooldown seconds`. Pepperoni-only is the small pie. Mid mixes pay a little more. Recipes built from the slow trays (cooldown ≥ 45s) pay more CPT per second than Neon Supreme. Neon Supreme stays at 10.
+
+| Recipe | Ingredients | CPT | Cooldown cost |
+| --- | --- | --- | --- |
+| Redline Pepperoni | 4 pepperoni | 2 | 100s |
+| Dockside Melt | 2 cheese, 2 pepperoni, 1 mushrooms | 3 | 120s |
+| Glitch Margherita | 2 cheese, 2 neon tomatoes, 1 holo basil | 4 | 160s |
+| Coolant Funghi | 1 cheese, 2 mushrooms, 1 cybertruffles, 1 holo basil | 5 | 175s |
+| Neon Supreme | 1 of each of the 9 toppings | 10 | 430s |
+| Truffle Protocol | 2 cybertruffles, 2 quantum cheese, 1 holo basil | 8 | 260s |
+| Afterburner | 1 pepperoni, 2 nano peppers, 2 cyber bacon | 12 | 355s |
+| Blackout Feast | 2 cybertruffles, 2 quantum cheese, 1 holo basil, 1 nano peppers, 1 cyber bacon | 16 | 425s |
+
+Upgrades are per topping, **40 levels**. Each level removes **2%** of that topping's base cooldown (integer floor). Level 40 leaves **20%**. The unweighted price starts at 20 CPT and rises by 20 CPT per level. A rarity weight scales it, so common trays are cheaper than the slow ones. The `Upgrades` contract does not store cooldowns. It stores the level. The server reads `levelsOf(session address)` from Fuji, caches that snapshot for **15 seconds**, and passes the resulting cooldown into Postgres. A purchase can make a tray ready immediately if the shorter duration has already elapsed since the last collect.
+
+| Topping | Levels | First level | Total to max | Cooldown at L0 | Cooldown at max |
+| --- | --- | --- | --- | --- | --- |
+| cheese | 40 | 20 CPT | 16,400 CPT | 20s | 4s |
+| pepperoni | 40 | 22 CPT | 18,040 CPT | 25s | 5s |
+| mushrooms | 40 | 24 CPT | 19,680 CPT | 30s | 6s |
+| neontomatoes | 40 | 26 CPT | 21,320 CPT | 35s | 7s |
+| cybertruffles | 40 | 32 CPT | 26,240 CPT | 45s | 9s |
+| holobasil | 40 | 30 CPT | 24,600 CPT | 50s | 10s |
+| quantumcheese | 40 | 36 CPT | 29,520 CPT | 60s | 12s |
+| nanopeppers | 40 | 40 CPT | 32,800 CPT | 75s | 15s |
+| cyberbacon | 40 | 44 CPT | 36,080 CPT | 90s | 18s |
+
+Half of each upgrade price is **burned**. The other half is transferred to the treasury address set at deploy (`TREASURY_ADDRESS`, defaulting to the deployer). Cheese to max burns 8,200 CPT. Cyber bacon to max burns 18,040 CPT.
+
+A claim locks the user row, writes a pending claim for the full pending balance, zeroes pending CPT, and bumps `claim_nonce` in one transaction. The server then signs:
 
 ```
 Claim(address user, uint256 amount, uint256 nonce, uint256 deadline)
@@ -78,6 +107,8 @@ openssl rand -base64 32
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | web | WalletConnect Cloud id. Injected wallets still load without it. |
 | `NEXT_PUBLIC_CPT_TOKEN_ADDRESS` | web | Overrides `packages/shared` Fuji JSON. |
 | `NEXT_PUBLIC_PIZZA_REWARDS_ADDRESS` | web | Overrides `packages/shared` Fuji JSON. |
+| `NEXT_PUBLIC_UPGRADES_ADDRESS` | web | Overrides `packages/shared` Fuji JSON. Collect still works at base cooldowns when this is unset. |
+| `TREASURY_ADDRESS` | contracts | Optional. Receives the unburned half of each upgrade purchase. Defaults to the deployer. |
 | `FUJI_RPC_URL` | web + Foundry | Default `https://api.avax-test.network/ext/bc/C/rpc`. |
 | `CLAIM_DEADLINE_SECONDS` | web | Signature lifetime. Default 3600. Clamped to 60s–7d. |
 | `UPSTASH_REDIS_REST_URL` / `TOKEN` | web | Optional. If both are set, limits use Upstash sliding windows. Otherwise the process keeps an in-memory window. |
@@ -99,7 +130,7 @@ Without Docker, create a database and set `DATABASE_URL` yourself, then `pnpm db
 On Supabase:
 
 1. Create a project.
-2. Open the SQL editor and run `supabase/migrations/20261014180000_init.sql`, or install the [Supabase CLI](https://supabase.com/docs/guides/cli), link the project, and `supabase db push`.
+2. Apply every file in `supabase/migrations` in name order (the SQL editor, `pnpm db:migrate`, or the [Supabase CLI](https://supabase.com/docs/guides/cli) with `supabase db push` after linking). The second migration turns recipe ingredients into quantity maps and seeds the rest of the menu.
 3. Copy the **direct** connection string (port 5432) into `DATABASE_URL`. The tables have RLS enabled and no policies, so the anon key cannot read them. The app connects as the database owner, which bypasses RLS. Functions are revoked from `PUBLIC`; the owner can still execute them.
 
 The kitchen page loads without a database. Collect, bake, and claim return a clear error until `DATABASE_URL` is set and the migration has been applied.
@@ -117,7 +148,7 @@ forge install OpenZeppelin/openzeppelin-contracts@v5.5.0 --no-git
 forge test
 ```
 
-Tests cover mint and burn access, replay, expired deadlines, wrong signer, wrong nonce, `msg.sender` not the user, pause, signer rotation, the global daily cap, a window reset after one day, and fuzz cases for amounts inside and above the cap.
+Tests cover mint and burn access, replay, expired deadlines, wrong signer, wrong nonce, `msg.sender` not the user, pause, signer rotation, the global daily cap, a window reset after one day, and fuzz cases for amounts inside and above the cap. Upgrade tests cover the 50/50 burn and treasury split, the 40-level rising price, max level, unknown ingredient ids, allowance and balance failures, pause, treasury rotation, and a fuzz over the nine ingredient ids.
 
 ### Deploy to Fuji
 
@@ -132,25 +163,26 @@ forge script script/DeployFuji.s.sol \
   --broadcast
 ```
 
-The script refuses any chain other than 43113. It deploys `CPTToken` (admin = deployer), deploys `PizzaRewards` (signer + owner = deployer unless `SIGNER_ADDRESS` is set, daily cap = `DAILY_MINT_CAP_CPT` whole tokens), grants `MINTER_ROLE` to PizzaRewards, and writes:
+The script refuses any chain other than 43113. It deploys `CPTToken` (admin = deployer), deploys `PizzaRewards` (signer + owner = deployer unless `SIGNER_ADDRESS` is set, daily cap = `DAILY_MINT_CAP_CPT` whole tokens), deploys `Upgrades` (treasury = `TREASURY_ADDRESS` or the deployer, owner = deployer), grants `MINTER_ROLE` to PizzaRewards, and writes:
 
 - `contracts/deployments/fuji.json`
 - `packages/shared/src/deployments/fuji.json`
 
-4. Copy the two addresses into `apps/web/.env.local` as `NEXT_PUBLIC_CPT_TOKEN_ADDRESS` and `NEXT_PUBLIC_PIZZA_REWARDS_ADDRESS`, or rely on the JSON the script just wrote.
+4. Copy the three addresses into `apps/web/.env.local` as `NEXT_PUBLIC_CPT_TOKEN_ADDRESS`, `NEXT_PUBLIC_PIZZA_REWARDS_ADDRESS`, and `NEXT_PUBLIC_UPGRADES_ADDRESS`, or rely on the JSON the script just wrote.
 5. Put the matching `SIGNER_PRIVATE_KEY` in `apps/web/.env.local`. Restart `pnpm dev`.
 
-The owner can later call `setSigner`, `setDailyMintCap`, `pause`, and `unpause`. A claim larger than the daily cap reverts on-chain and stays pending; raise the cap or wait for the window. The signature does not include the cap, so raising it unblocks the same slip.
+The PizzaRewards owner can later call `setSigner`, `setDailyMintCap`, `pause`, and `unpause`. A claim larger than the daily cap reverts on-chain and stays pending; raise the cap or wait for the window. The signature does not include the cap, so raising it unblocks the same slip. The Upgrades owner can call `setTreasury`, `pause`, and `unpause`. Prices and the 50% burn are constants.
 
 ## End-to-end on Fuji
 
 1. `pnpm dev` and open `http://127.0.0.1:41731/play`. The street is `http://127.0.0.1:41731`.
 2. Connect Core or MetaMask and switch to Avalanche Fuji.
 3. **Sign the booth slip.** That is SIWE. It does not send a transaction. The httpOnly cookie stores the address. Game routes ignore any address in the body.
-4. Collect all nine toppings. The slowest tray is cyberbacon at 90 seconds, so the first pie takes about that long if you start from empty. Each collect is one topping, capped, and cooldown-gated on the server.
-5. **Bake Neon Supreme.** Pending CPT becomes 10. Inventory drops by one each.
+4. Collect toppings. Each collect is one unit, capped, and cooldown-gated on the server. Neon Supreme still waits on the slowest tray (cyberbacon, 90 seconds) if you start from empty. Redline Pepperoni only needs four pepperoni.
+5. **Bake a recipe.** The menu shows ingredients, the CPT reward, and whether you can bake it. Redline Pepperoni adds 2 pending CPT. Neon Supreme still adds 10.
 6. **Mint CPT.** The booth prepares the claim, signs it, and the wallet sends `PizzaRewards.claim`. You need a little Fuji AVAX for gas. After the receipt, the booth confirms the `Claimed` event and the next nonce opens.
-7. Wallet CPT balance on the pass should show 10.
+7. **Buy a cooldown upgrade** with the CPT you just minted. The button approves the next level's price when the allowance is short, then sends `Upgrades.purchase`. Half the CPT is burned and half arrives in the treasury. The booth then re-reads `levelsOf` for the signed-in wallet. A level bought by a different address does not apply to this shift.
+8. Wallet CPT on the pass shows the minted amount minus any upgrade you bought. A Neon Supreme claim with no upgrade is 10 CPT.
 
 If the mint button says contracts are not deployed, the public addresses are still the zero address.
 
@@ -180,9 +212,10 @@ GitHub Actions runs `forge test`, lint, typecheck, the unit tests, and the migra
 
 ## Security notes
 
-- The session cookie is the only source of the player address.
-- Collect, bake, and claim amounts are computed in Postgres from server constants.
-- Rate limits are per IP for auth and per address+IP for game routes. Upstash is used when configured; otherwise memory, which resets when the process restarts.
+- The session cookie is the only source of the player address. Game routes ignore any address in the body.
+- Collect, bake, and claim amounts are computed in Postgres. Bake takes a recipe id from a server allowlist. The quantity map and CPT reward are the recipes row, and that row must match `packages/shared`.
+- Upgrade levels are `Upgrades.levelsOf` for the session address. The process caches a successful read for 15 seconds. A failed read keeps the last good snapshot, or level 0 when there is none, which only lengthens cooldowns. The client cannot submit a level.
+- Rate limits are per IP for auth and per address+IP for game routes, including the post-purchase level refresh. Upstash is used when configured; otherwise memory, which resets when the process restarts. The level cache is also per process.
 - An unused claim does not burn the next nonce: the open row is reused until Fuji confirms it.
 - The signer key can mint up to the daily cap for any address it signs. Keep it off developer laptops that you do not control, and prefer a signer that is not the owner.
 
@@ -193,5 +226,5 @@ The repo does not contain a Supabase project, Fuji AVAX, or a private key.
 1. Create a Supabase project (or start Postgres with `docker compose up -d`) and apply the migration.
 2. Create a 32+ character `SESSION_SECRET`.
 3. Get Fuji AVAX for the deployer and for the wallet you will play with.
-4. Create a deployer key and a signer key. Deploy with `forge script`, then set `SIGNER_PRIVATE_KEY` and the two contract addresses in `apps/web/.env.local`.
+4. Create a deployer key and a signer key. Deploy with `forge script`, then set `SIGNER_PRIVATE_KEY` and the three contract addresses in `apps/web/.env.local`. Set `TREASURY_ADDRESS` before deploy if the unburned half of upgrade sales should not sit on the deployer.
 5. Create a WalletConnect Cloud project if you want WalletConnect QR. Injected wallets work for a local Core/MetaMask test without it.

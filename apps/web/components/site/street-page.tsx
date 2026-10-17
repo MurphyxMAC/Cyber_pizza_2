@@ -11,8 +11,10 @@ import {
   FUJI_CHAIN_ID,
   INGREDIENTS,
   PIZZA_CPT_REWARD,
-  RECIPE_ID,
-  RECIPE_NAME,
+  RECIPES,
+  UPGRADE_MAX_LEVEL,
+  upgradePriceCpt,
+  upgradeTotalCpt,
 } from "@cyberpizza/shared";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -30,14 +32,14 @@ const slowest = INGREDIENTS.reduce((current, item) =>
 const shiftSteps = [
   ["01", "Connect", "A wallet on Avalanche Fuji. Testnet AVAX pays the mint."],
   ["02", "Sign the slip", "SIWE opens your shift. The signature does not spend gas."],
-  ["03", "Bake and claim", `One of each topping makes a pie worth ${PIZZA_CPT_REWARD} pending CPT.`],
+  ["03", "Bake and claim", "Pick a recipe. Pending CPT is that pie's reward, then you mint it."],
 ] as const;
 
 const flow = [
   `${INGREDIENTS.length} toppings`,
-  RECIPE_NAME,
-  `${PIZZA_CPT_REWARD} pending CPT`,
-  `ERC-20 on Fuji`,
+  `${RECIPES.length} recipes`,
+  "Pending CPT",
+  "ERC-20 on Fuji",
 ] as const;
 
 export function StreetPage() {
@@ -53,12 +55,12 @@ export function StreetPage() {
                 Fuji testnet · chain {FUJI_CHAIN_ID}
               </p>
               <h1 className="mt-5 max-w-xl text-5xl font-semibold tracking-tight text-balance sm:text-6xl lg:text-7xl">
-                Bake one neon pie.
+                Bake the night menu.
                 <span className="mt-1 block text-primary">Mint the CPT.</span>
               </h1>
               <p className="mt-5 max-w-xl text-lg text-pretty text-muted-foreground">
-                Collect {INGREDIENTS.length} toppings, bake a {RECIPE_NAME} for {PIZZA_CPT_REWARD} pending CPT, then
-                claim that balance on-chain as ERC-20 CPT.
+                Collect {INGREDIENTS.length} toppings, bake one of {RECIPES.length} recipes for pending CPT, then
+                claim that balance on-chain as ERC-20 CPT. Spend CPT to shorten a tray&apos;s cooldown.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link href="/play" className={primaryCta}>
@@ -71,7 +73,7 @@ export function StreetPage() {
               </div>
               <dl className="mt-8 grid max-w-lg grid-cols-3 gap-3">
                 <Fact label="Toppings" value={String(INGREDIENTS.length)} />
-                <Fact label="Per pie" value={`${PIZZA_CPT_REWARD} CPT`} />
+                <Fact label="Recipes" value={String(RECIPES.length)} />
                 <Fact label="Network" value="Fuji" />
               </dl>
             </div>
@@ -115,8 +117,16 @@ export function StreetPage() {
               Collect, bake, and claim amounts are computed in Postgres from the shared constants. The wallet only
               mints what the booth already signed.
             </Rule>
-            <Rule title={`One recipe: ${RECIPE_NAME}`}>
-              Baking consumes 1 of each topping and adds {PIZZA_CPT_REWARD} pending CPT. The recipe id is {RECIPE_ID}.
+            <Rule title={`${RECIPES.length} recipes, one till`}>
+              The booth accepts a recipe id. Postgres subtracts that row&apos;s quantities and adds that row&apos;s CPT.
+              Neon Supreme is still {PIZZA_CPT_REWARD} CPT. A pepperoni pie pays less. Rare trays pay more.
+            </Rule>
+            <Rule title={`Cooldown upgrades, ${UPGRADE_MAX_LEVEL} levels`}>
+              Each level cuts 2% of one topping&apos;s base cooldown, down to 20%. Cheese starts at{" "}
+              {upgradePriceCpt("cheese", 0)} CPT and costs {upgradeTotalCpt("cheese").toLocaleString("en-US")} CPT to
+              max. Cyber bacon starts at {upgradePriceCpt("cyberbacon", 0)} CPT and costs{" "}
+              {upgradeTotalCpt("cyberbacon").toLocaleString("en-US")} CPT to max. The wallet approves CPT and the
+              Upgrades contract burns half and sends half to the treasury. The server reads the level from Fuji.
             </Rule>
             <Rule title={`${slowest.name} sets the pace`}>
               If you start from empty, the first pie waits on the slowest tray: {slowest.name},{" "}
@@ -127,6 +137,33 @@ export function StreetPage() {
               for the next slip.
             </Rule>
           </div>
+        </Section>
+
+        <Section id="recipes" kicker="The menu" title={`${RECIPES.length} pies. The till picks the CPT.`}>
+          <p className="max-w-2xl text-pretty text-muted-foreground">
+            Rewards follow ingredient cost. Four pepperoni is the small pie. Mixes sit in the middle. Recipes built
+            from cybertruffles, quantum cheese, nano peppers, and cyber bacon pay more per second of cooldown. Neon
+            Supreme stays at {PIZZA_CPT_REWARD} CPT.
+          </p>
+          <ul className="mt-8 grid gap-3 sm:grid-cols-2">
+            {RECIPES.map((recipe) => (
+              <li key={recipe.id} className="stall-panel rounded-2xl p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="text-base font-semibold">{recipe.name}</h3>
+                  <p className="shrink-0 font-mono text-sm text-accent">+{recipe.cptReward} CPT</p>
+                </div>
+                <p className="mt-1 text-sm text-pretty text-muted-foreground">{recipe.blurb}</p>
+                <p className="mt-3 font-mono text-xs text-muted-foreground">
+                  {recipe.ingredients
+                    .map((item) => {
+                      const name = INGREDIENTS.find((ingredient) => ingredient.id === item.id)?.name ?? item.id;
+                      return `${item.quantity} ${name}`;
+                    })
+                    .join(" · ")}
+                </p>
+              </li>
+            ))}
+          </ul>
         </Section>
 
         <Section id="toppings" kicker="Topping trays" title="Nine trays. Server cooldown. Hard cap.">
@@ -162,7 +199,7 @@ export function StreetPage() {
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(260px,0.9fr)]">
             <ol className="grid gap-3">
               {[
-                ["Bake", `The server adds ${PIZZA_CPT_REWARD} pending CPT and drops one of each topping. The wallet stays quiet.`],
+                ["Bake", "The server adds that recipe's CPT and subtracts its quantities. The wallet stays quiet."],
                 [
                   "Sign",
                   `The booth signs an EIP-712 Claim for the full pending balance, the nonce, and a deadline. Default lifetime is ${DEFAULT_CLAIM_DEADLINE_SECONDS / 60} minutes.`,
@@ -191,7 +228,10 @@ export function StreetPage() {
                 label="Deployed addresses"
                 value="The checked-in Fuji file still uses the zero address. Minting stays off until a deploy writes real addresses."
               />
-              <FactRow label="Burn" value="Holders can burn CPT. Only the minter role can mint." />
+              <FactRow
+                label="Burn"
+                value="Holders can burn CPT. Only the minter role can mint. An upgrade purchase burns half the price and sends half to the treasury."
+              />
             </dl>
           </div>
         </Section>
@@ -224,12 +264,12 @@ export function StreetPage() {
             <article className="stall-panel rounded-3xl p-5">
               <h3 className="font-mono text-[11px] tracking-[0.22em] text-accent">In the repository</h3>
               <ul className="mt-4 flex flex-col gap-3 text-sm">
-                <li>CPTToken and PizzaRewards, Forge tests, and a Fuji deploy script that refuses any other chain.</li>
+                <li>CPTToken, PizzaRewards, and Upgrades, Forge tests, and a Fuji deploy script that refuses any other chain.</li>
                 <li>Postgres tables for users, inventory, recipes, claims, and an actions log.</li>
                 <li>The Next.js booth: wallet connect, SIWE, collect, bake, and claim.</li>
                 <li>
-                  {INGREDIENTS.length} toppings with server cooldowns and caps, and the {RECIPE_NAME} recipe for{" "}
-                  {PIZZA_CPT_REWARD} pending CPT.
+                  {INGREDIENTS.length} toppings with server cooldowns and caps, and {RECIPES.length} recipes. Neon Supreme
+                  still pays {PIZZA_CPT_REWARD} pending CPT.
                 </li>
               </ul>
             </article>
