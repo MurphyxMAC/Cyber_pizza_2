@@ -75,7 +75,7 @@ If a claim is still pending, the next request reuses that nonce (and refreshes t
 - Node.js 22 and pnpm 10
 - [Foundry](https://book.getfoundry.sh/getting-started/installation) (`forge` 1.8+)
 - Postgres 15+ (Docker or a Supabase project)
-- A Fuji wallet with testnet AVAX, plus a WalletConnect Cloud project id if you want the QR modal
+- A Fuji wallet with testnet AVAX. MetaMask, Core, Rabby, and any other EIP-6963 browser wallet can connect. WalletConnect is not required.
 - Two keys: a deployer (owner) and a server signer. They can be the same address for a first test. Use a separate signer for anything you leave running.
 
 ## Environment
@@ -104,7 +104,6 @@ openssl rand -base64 32
 | `DATABASE_URL` | web | Postgres connection. Use the direct Supabase URI or the session pooler, not transaction mode. The claim path takes a row lock. |
 | `SESSION_SECRET` | web | iron-session password. Cookie is httpOnly. |
 | `SIGNER_PRIVATE_KEY` | web | EIP-712 claim signer. |
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | web | WalletConnect Cloud id. Injected wallets still load without it. |
 | `NEXT_PUBLIC_CPT_TOKEN_ADDRESS` | web | Overrides `packages/shared` Fuji JSON. |
 | `NEXT_PUBLIC_PIZZA_REWARDS_ADDRESS` | web | Overrides `packages/shared` Fuji JSON. |
 | `NEXT_PUBLIC_UPGRADES_ADDRESS` | web | Overrides `packages/shared` Fuji JSON. Collect still works at base cooldowns when this is unset. |
@@ -131,7 +130,7 @@ On Supabase:
 
 1. Create a project.
 2. Apply every file in `supabase/migrations` in name order (the SQL editor, `pnpm db:migrate`, or the [Supabase CLI](https://supabase.com/docs/guides/cli) with `supabase db push` after linking). The second migration turns recipe ingredients into quantity maps and seeds the rest of the menu.
-3. Copy the **direct** connection string (port 5432) into `DATABASE_URL`. The tables have RLS enabled and no policies, so the anon key cannot read them. The app connects as the database owner, which bypasses RLS. Functions are revoked from `PUBLIC`; the owner can still execute them.
+3. Copy the **direct** connection string (port 5432) into `DATABASE_URL`. The tables have RLS enabled and no policies, so the anon key cannot read them. The app connects as the database owner, which bypasses RLS. `ensure_user`, `collect_ingredient`, `make_pizza`, `prepare_claim`, `attach_claim_signature`, and `confirm_claim` are revoked from `PUBLIC`, `anon`, and `authenticated` (the API roles are skipped when they do not exist). The owner can still execute them. `touch_updated_at` has a fixed `search_path`.
 
 The kitchen page loads without a database. Collect, bake, and claim return a clear error until `DATABASE_URL` is set and the migration has been applied.
 
@@ -193,7 +192,7 @@ The street and the kitchen are one Next.js app.
 1. Import this repository.
 2. Set the project **Root Directory** to `apps/web`.
 3. Leave the framework preset on Next.js. `apps/web/vercel.json` installs with `pnpm install --filter @cyberpizza/web...`, which pulls that app and its workspace packages. `outputFileTracingRoot` in `apps/web/next.config.ts` points file tracing at the repo root.
-4. Add the web keys from `.env.example`. The street renders without them. Collect, bake, and claim need `DATABASE_URL`, `SESSION_SECRET`, and, for minting, a signer key plus deployed Fuji addresses.
+4. Add the web keys from `.env.example`. The street renders without them. Collect, bake, and claim need `DATABASE_URL`, `SESSION_SECRET`, and, for minting, a signer key plus deployed Fuji addresses. `apps/web/vercel.json` runs serverless functions in `fra1` (Frankfurt), next to the database in eu-central-1.
 
 CI uses Node.js 22. The root `package.json` `engines` field asks for Node 22 or newer.
 
@@ -218,13 +217,23 @@ GitHub Actions runs `forge test`, lint, typecheck, the unit tests, and the migra
 - Rate limits are per IP for auth and per address+IP for game routes, including the post-purchase level refresh. Upstash is used when configured; otherwise memory, which resets when the process restarts. The level cache is also per process.
 - An unused claim does not burn the next nonce: the open row is reused until Fuji confirms it.
 - The signer key can mint up to the daily cap for any address it signs. Keep it off developer laptops that you do not control, and prefer a signer that is not the owner.
+- The game functions are not executable by Supabase `anon` or `authenticated`. A new migration revokes those grants and the default EXECUTE those roles would receive on later functions. Plain Postgres, which has neither role, skips that revoke.
 
 ## What you still have to do
 
 The repo does not contain a Supabase project, Fuji AVAX, or a private key.
 
-1. Create a Supabase project (or start Postgres with `docker compose up -d`) and apply the migration.
+1. Create a Supabase project (or start Postgres with `docker compose up -d`) and apply every file in `supabase/migrations`. The latest one revokes API execute on the game functions. It is safe to run on a database where that revoke was already applied by hand.
 2. Create a 32+ character `SESSION_SECRET`.
 3. Get Fuji AVAX for the deployer and for the wallet you will play with.
 4. Create a deployer key and a signer key. Deploy with `forge script`, then set `SIGNER_PRIVATE_KEY` and the three contract addresses in `apps/web/.env.local`. Set `TREASURY_ADDRESS` before deploy if the unburned half of upgrade sales should not sit on the deployer.
-5. Create a WalletConnect Cloud project if you want WalletConnect QR. Injected wallets work for a local Core/MetaMask test without it.
+
+## Wallets
+
+The booth connects injected browser wallets only. RainbowKit still draws the connect button. Wagmi discovers EIP-6963 providers (MetaMask, Core, Rabby, and any other extension that announces itself) and `injectedWallet` covers `window.ethereum`. No WalletConnect relay call is made, and `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is not read.
+
+To offer the WalletConnect QR modal later:
+
+1. Create a project at [Reown Cloud](https://cloud.reown.com).
+2. Set `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` in `apps/web/.env.local` and in the Vercel project.
+3. In `apps/web/lib/wagmi.ts`, switch the config back to RainbowKit `getDefaultConfig({ appName: "CyberPizza", projectId, chains: [avalancheFuji], ssr: true })`, or add `walletConnectWallet` to the `connectorsForWallets` list and pass that project id. That connector is what opens the relay.

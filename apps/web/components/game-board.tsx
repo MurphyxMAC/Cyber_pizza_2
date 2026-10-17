@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PizzaMark } from "@/components/pizza-mark";
-import { wagmiConfig } from "@/app/providers";
+import { wagmiConfig } from "@/lib/wagmi";
 import { RecipeMenu } from "@/components/recipe-menu";
 import { UpgradeShop } from "@/components/upgrade-shop";
 import {

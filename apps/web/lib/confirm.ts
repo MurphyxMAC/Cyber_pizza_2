@@ -43,6 +43,6 @@ export async function confirmClaim(address: string, txHash: Hex) {
     throw new GameError(409, "claim_event_missing", "That transaction did not mint CPT for this wallet.");
   }
 
-  await getSql()`select confirm_claim(${address}, ${match.args.nonce.toString()}::bigint, ${txHash})`;
+  await getSql()`select confirm_claim(${address}::text, ${match.args.nonce.toString()}::bigint, ${txHash}::text)`;
   return getGameState(address);
 }
