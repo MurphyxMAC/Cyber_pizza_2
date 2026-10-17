@@ -52,7 +52,7 @@ const fallbackContracts = resolveAddresses({
 });
 
 const previewInventory: IngredientState[] = INGREDIENTS.map((ingredient) => {
-  const price = upgradePriceCpt(0);
+  const price = upgradePriceCpt(ingredient.id, 0);
   return {
     id: ingredient.id,
     name: ingredient.name,
@@ -316,7 +316,7 @@ export function GameBoard() {
         address: upgradesAddress,
         abi: upgradesAbi,
         functionName: "priceOf",
-        args: [current],
+        args: [index, current],
         chainId: FUJI_CHAIN_ID,
       });
       const approved = await readContract(wagmiConfig, {

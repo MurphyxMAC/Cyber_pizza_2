@@ -12,8 +12,9 @@ import {
   INGREDIENTS,
   PIZZA_CPT_REWARD,
   RECIPES,
-  UPGRADE_LEVEL_PRICES_CPT,
   UPGRADE_MAX_LEVEL,
+  upgradePriceCpt,
+  upgradeTotalCpt,
 } from "@cyberpizza/shared";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -121,9 +122,11 @@ export function StreetPage() {
               Neon Supreme is still {PIZZA_CPT_REWARD} CPT. A pepperoni pie pays less. Rare trays pay more.
             </Rule>
             <Rule title={`Cooldown upgrades, ${UPGRADE_MAX_LEVEL} levels`}>
-              Each level cuts 12% of one topping&apos;s base cooldown, down to 40%. Prices are{" "}
-              {UPGRADE_LEVEL_PRICES_CPT.join(", ")} CPT. The wallet approves CPT and the Upgrades contract burns half
-              and sends half to the treasury. The server reads the level from Fuji.
+              Each level cuts 2% of one topping&apos;s base cooldown, down to 20%. Cheese starts at{" "}
+              {upgradePriceCpt("cheese", 0)} CPT and costs {upgradeTotalCpt("cheese").toLocaleString("en-US")} CPT to
+              max. Cyber bacon starts at {upgradePriceCpt("cyberbacon", 0)} CPT and costs{" "}
+              {upgradeTotalCpt("cyberbacon").toLocaleString("en-US")} CPT to max. The wallet approves CPT and the
+              Upgrades contract burns half and sends half to the treasury. The server reads the level from Fuji.
             </Rule>
             <Rule title={`${slowest.name} sets the pace`}>
               If you start from empty, the first pie waits on the slowest tray: {slowest.name},{" "}

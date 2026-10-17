@@ -42,18 +42,21 @@ Recipes live in `packages/shared/src/constants.ts` and are seeded into `recipes`
 | Afterburner | 1 pepperoni, 2 nano peppers, 2 cyber bacon | 12 | 355s |
 | Blackout Feast | 2 cybertruffles, 2 quantum cheese, 1 holo basil, 1 nano peppers, 1 cyber bacon | 16 | 425s |
 
-Upgrades are per topping, max level **5**. Level 0→1 costs **5 CPT** and the price doubles each level. Each level removes **12%** of that topping's base cooldown (integer floor). Level 5 leaves **40%**. The `Upgrades` contract does not store cooldowns. It stores the level. The server reads `levelsOf(session address)` from Fuji, caches that snapshot for **15 seconds**, and passes the resulting cooldown into Postgres. A purchase can make a tray ready immediately if the shorter duration has already elapsed since the last collect.
+Upgrades are per topping, **40 levels**. Each level removes **2%** of that topping's base cooldown (integer floor). Level 40 leaves **20%**. The unweighted price starts at 20 CPT and rises by 20 CPT per level. A rarity weight scales it, so common trays are cheaper than the slow ones. The `Upgrades` contract does not store cooldowns. It stores the level. The server reads `levelsOf(session address)` from Fuji, caches that snapshot for **15 seconds**, and passes the resulting cooldown into Postgres. A purchase can make a tray ready immediately if the shorter duration has already elapsed since the last collect.
 
-| Level bought | Price (CPT) | Cooldown left | Cheese | Pepperoni | Mushrooms | Neon tomatoes | Cybertruffles | Holo basil | Quantum cheese | Nano peppers | Cyber bacon |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 (base) | — | 100% | 20s | 25s | 30s | 35s | 45s | 50s | 60s | 75s | 90s |
-| 1 | 5 | 88% | 17s | 22s | 26s | 30s | 39s | 44s | 52s | 66s | 79s |
-| 2 | 10 | 76% | 15s | 19s | 22s | 26s | 34s | 38s | 45s | 57s | 68s |
-| 3 | 20 | 64% | 12s | 16s | 19s | 22s | 28s | 32s | 38s | 48s | 57s |
-| 4 | 40 | 52% | 10s | 13s | 15s | 18s | 23s | 26s | 31s | 39s | 46s |
-| 5 | 80 | 40% | 8s | 10s | 12s | 14s | 18s | 20s | 24s | 30s | 36s |
+| Topping | Levels | First level | Total to max | Cooldown at L0 | Cooldown at max |
+| --- | --- | --- | --- | --- | --- |
+| cheese | 40 | 20 CPT | 16,400 CPT | 20s | 4s |
+| pepperoni | 40 | 22 CPT | 18,040 CPT | 25s | 5s |
+| mushrooms | 40 | 24 CPT | 19,680 CPT | 30s | 6s |
+| neontomatoes | 40 | 26 CPT | 21,320 CPT | 35s | 7s |
+| cybertruffles | 40 | 32 CPT | 26,240 CPT | 45s | 9s |
+| holobasil | 40 | 30 CPT | 24,600 CPT | 50s | 10s |
+| quantumcheese | 40 | 36 CPT | 29,520 CPT | 60s | 12s |
+| nanopeppers | 40 | 40 CPT | 32,800 CPT | 75s | 15s |
+| cyberbacon | 40 | 44 CPT | 36,080 CPT | 90s | 18s |
 
-Half of each upgrade price is **burned**. The other half is transferred to the treasury address set at deploy (`TREASURY_ADDRESS`, defaulting to the deployer). Maxing one topping costs 155 CPT, of which 77.5 is burned.
+Half of each upgrade price is **burned**. The other half is transferred to the treasury address set at deploy (`TREASURY_ADDRESS`, defaulting to the deployer). Cheese to max burns 8,200 CPT. Cyber bacon to max burns 18,040 CPT.
 
 A claim locks the user row, writes a pending claim for the full pending balance, zeroes pending CPT, and bumps `claim_nonce` in one transaction. The server then signs:
 
@@ -145,7 +148,7 @@ forge install OpenZeppelin/openzeppelin-contracts@v5.5.0 --no-git
 forge test
 ```
 
-Tests cover mint and burn access, replay, expired deadlines, wrong signer, wrong nonce, `msg.sender` not the user, pause, signer rotation, the global daily cap, a window reset after one day, and fuzz cases for amounts inside and above the cap. Upgrade tests cover the 50/50 burn and treasury split, the doubling price, max level, unknown ingredient ids, allowance and balance failures, pause, treasury rotation, and a fuzz over the nine ingredient ids.
+Tests cover mint and burn access, replay, expired deadlines, wrong signer, wrong nonce, `msg.sender` not the user, pause, signer rotation, the global daily cap, a window reset after one day, and fuzz cases for amounts inside and above the cap. Upgrade tests cover the 50/50 burn and treasury split, the 40-level rising price, max level, unknown ingredient ids, allowance and balance failures, pause, treasury rotation, and a fuzz over the nine ingredient ids.
 
 ### Deploy to Fuji
 

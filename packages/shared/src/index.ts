@@ -17,9 +17,11 @@ export {
   RECIPES,
   UPGRADE_BURN_BPS,
   UPGRADE_LEVEL_CACHE_MS,
-  UPGRADE_LEVEL_PRICES_CPT,
   UPGRADE_MAX_LEVEL,
   UPGRADE_MIN_COOLDOWN_BPS,
+  UPGRADE_PRICE_BASE_CPT,
+  UPGRADE_PRICE_STEP_CPT,
+  UPGRADE_PRICE_WEIGHT_BPS,
   UPGRADE_REDUCTION_BPS_PER_LEVEL,
   ZERO_ADDRESS,
   cooldownAtLevel,
@@ -32,6 +34,8 @@ export {
   recipeCooldownCost,
   upgradePriceCpt,
   upgradePriceWei,
+  upgradeTotalCpt,
+  upgradeUnitCpt,
 } from "./constants";
 export type { IngredientId, RecipeDefinition, RecipeId, RecipeIngredient } from "./constants";
 export { cptTokenAbi, pizzaRewardsAbi, upgradesAbi } from "./abi";

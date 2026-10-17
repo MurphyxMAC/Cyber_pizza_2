@@ -106,7 +106,7 @@ export async function getGameState(address: string): Promise<GameState> {
     const cooldownSeconds = cooldownAtLevel(meta.cooldownSeconds, upgradeLevel);
     const nextReady = readyAt(row?.last_collected_at ?? null, cooldownSeconds);
     const cooled = !nextReady || new Date(nextReady).getTime() <= now;
-    const price = upgradePriceCpt(upgradeLevel);
+    const price = upgradePriceCpt(id, upgradeLevel);
     return {
       id,
       name: meta.name,

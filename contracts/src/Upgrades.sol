@@ -13,17 +13,20 @@ import {CPTToken} from "./CPTToken.sol";
 /// @dev Ingredient ids are 0..8 and MUST stay aligned with packages/shared INGREDIENTS:
 ///      0 cheese, 1 pepperoni, 2 mushrooms, 3 cybertruffles, 4 neontomatoes,
 ///      5 holobasil, 6 quantumcheese, 7 nanopeppers, 8 cyberbacon.
-///      Prices and the burn share are constants: level 0→1 costs 5 CPT and each further
-///      level doubles (10, 20, 40, 80). Half of every price is burned. The other half
-///      is transferred to `treasury`. Cooldown math lives off-chain; this contract only
-///      stores the level the server reads.
+///      Forty levels. Unweighted price starts at 20 CPT and rises by 20 CPT per level.
+///      A rarity weight scales that price (cheese 1×, cyber bacon 2.2×). Half of every
+///      price is burned. The other half is transferred to `treasury`. Cooldown math
+///      lives off-chain (2% of base per level, floor 20%); this contract only stores
+///      the level the server reads.
 contract Upgrades is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint8 public constant INGREDIENT_COUNT = 9;
-    uint8 public constant MAX_LEVEL = 5;
+    uint8 public constant MAX_LEVEL = 40;
     /// @notice Basis points of each purchase that are burned. The rest goes to treasury.
     uint16 public constant BURN_BPS = 5_000;
+    uint16 public constant PRICE_BASE_CPT = 20;
+    uint16 public constant PRICE_STEP_CPT = 20;
 
     CPTToken public immutable cpt;
     address public treasury;
@@ -63,11 +66,20 @@ contract Upgrades is Ownable, Pausable, ReentrancyGuard {
         _unpause();
     }
 
-    /// @notice CPT required to buy the next level, given the buyer's current level.
-    /// @dev Level 0 → 5 CPT, then 10, 20, 40, 80. Reverts at MAX_LEVEL.
-    function priceOf(uint8 currentLevel) public pure returns (uint256) {
+    /// @notice Rarity weight for an ingredient. 10_000 is 1×. Order matches INGREDIENTS.
+    function priceWeightBps(uint8 ingredientId) public pure returns (uint16) {
+        if (ingredientId >= INGREDIENT_COUNT) revert UnknownIngredient();
+        uint16[9] memory weights =
+            [uint16(10_000), 11_000, 12_000, 16_000, 13_000, 15_000, 18_000, 20_000, 22_000];
+        return weights[ingredientId];
+    }
+
+    /// @notice CPT required to buy the next level of one topping.
+    /// @dev Unweighted whole CPT is 20 + 20 × currentLevel. The rarity weight scales it.
+    function priceOf(uint8 ingredientId, uint8 currentLevel) public pure returns (uint256) {
         if (currentLevel >= MAX_LEVEL) revert MaxLevel();
-        return (5 ether) << currentLevel;
+        uint256 unit = uint256(PRICE_BASE_CPT) + uint256(PRICE_STEP_CPT) * uint256(currentLevel);
+        return unit * uint256(priceWeightBps(ingredientId)) * 1 ether / 10_000;
     }
 
     /// @notice Next price for `user`, or 0 when that ingredient is already maxed.
@@ -75,7 +87,7 @@ contract Upgrades is Ownable, Pausable, ReentrancyGuard {
         if (ingredientId >= INGREDIENT_COUNT) revert UnknownIngredient();
         uint8 current = level[user][ingredientId];
         if (current >= MAX_LEVEL) return 0;
-        return priceOf(current);
+        return priceOf(ingredientId, current);
     }
 
     /// @notice Levels for ingredient ids 0..8. Index matches packages/shared INGREDIENTS.
@@ -92,7 +104,7 @@ contract Upgrades is Ownable, Pausable, ReentrancyGuard {
         uint8 current = level[msg.sender][ingredientId];
         if (current >= MAX_LEVEL) revert MaxLevel();
 
-        uint256 price = priceOf(current);
+        uint256 price = priceOf(ingredientId, current);
         uint256 burned = (price * BURN_BPS) / 10_000;
         uint256 treasuryAmount = price - burned;
         uint8 nextLevel = current + 1;

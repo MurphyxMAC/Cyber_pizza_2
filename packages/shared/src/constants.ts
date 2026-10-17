@@ -17,15 +17,25 @@ export const RECIPE_NAME = "Neon Supreme";
 
 /**
  * Cooldown upgrades. These numbers are the contract's constants in Upgrades.sol.
- * Level 0→1 costs 5 CPT and the price doubles each level. Each level removes 12%
- * of the base cooldown, floored, and level 5 leaves 40%. The server applies the
- * cooldown; the contract only stores the level.
+ * Forty levels. Each level removes 2% of the base cooldown, and level 40 leaves 20%.
+ * The unweighted price starts at 20 CPT and rises by 20 CPT per level (20, 40, …, 800).
+ * Each topping multiplies that price by a rarity weight. Cheese is 1× (16,400 CPT to max).
+ * Cyber bacon is 2.2× (36,080 CPT to max). Half of every price is burned.
+ * The server applies the cooldown; the contract only stores the level.
  */
-export const UPGRADE_MAX_LEVEL = 5;
+export const UPGRADE_MAX_LEVEL = 40;
 export const UPGRADE_BURN_BPS = 5_000;
-export const UPGRADE_REDUCTION_BPS_PER_LEVEL = 1_200;
-export const UPGRADE_MIN_COOLDOWN_BPS = 4_000;
-export const UPGRADE_LEVEL_PRICES_CPT = [5, 10, 20, 40, 80] as const;
+export const UPGRADE_REDUCTION_BPS_PER_LEVEL = 200;
+export const UPGRADE_MIN_COOLDOWN_BPS = 2_000;
+export const UPGRADE_PRICE_BASE_CPT = 20;
+export const UPGRADE_PRICE_STEP_CPT = 20;
+/**
+ * Rarity weight in basis points, same order as INGREDIENTS / on-chain ids.
+ * 10_000 is 1×. Must match Upgrades.priceWeightBps.
+ */
+export const UPGRADE_PRICE_WEIGHT_BPS = [
+  10_000, 11_000, 12_000, 16_000, 13_000, 15_000, 18_000, 20_000, 22_000,
+] as const;
 /** How long a process may reuse an on-chain level read. */
 export const UPGRADE_LEVEL_CACHE_MS = 15_000;
 
@@ -157,16 +167,31 @@ export function cooldownAtLevel(baseSeconds: number, level: number) {
   return Math.max(1, Math.floor((baseSeconds * bps) / 10_000));
 }
 
-/** Whole CPT to buy the next level, or null when `currentLevel` is already maxed. */
-export function upgradePriceCpt(currentLevel: number) {
-  const level = Math.trunc(currentLevel);
-  if (level < 0 || level >= UPGRADE_MAX_LEVEL) return null;
-  return UPGRADE_LEVEL_PRICES_CPT[level];
+/** Unweighted whole CPT for the level being purchased. Level 0 costs the base. */
+export function upgradeUnitCpt(currentLevel: number) {
+  return UPGRADE_PRICE_BASE_CPT + UPGRADE_PRICE_STEP_CPT * currentLevel;
 }
 
-export function upgradePriceWei(currentLevel: number) {
-  const whole = upgradePriceCpt(currentLevel);
-  if (whole === undefined || whole === null) return null;
+/** Whole CPT to buy the next level of one topping, or null when it is already maxed. */
+export function upgradePriceCpt(id: IngredientId, currentLevel: number) {
+  const level = Math.trunc(currentLevel);
+  if (level < 0 || level >= UPGRADE_MAX_LEVEL) return null;
+  const weight = UPGRADE_PRICE_WEIGHT_BPS[ingredientIndex(id)];
+  return Math.floor((upgradeUnitCpt(level) * weight) / 10_000);
+}
+
+/** Sum of every level from 0 through max for one topping. */
+export function upgradeTotalCpt(id: IngredientId) {
+  let total = 0;
+  for (let level = 0; level < UPGRADE_MAX_LEVEL; level += 1) {
+    total += upgradePriceCpt(id, level) ?? 0;
+  }
+  return total;
+}
+
+export function upgradePriceWei(id: IngredientId, currentLevel: number) {
+  const whole = upgradePriceCpt(id, currentLevel);
+  if (whole === null) return null;
   return BigInt(whole) * CPT_WEI;
 }
 

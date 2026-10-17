@@ -8,10 +8,11 @@ import {
   PIZZA_CPT_REWARD,
   RECIPES,
   recipeCooldownCost,
-  UPGRADE_LEVEL_PRICES_CPT,
   UPGRADE_MAX_LEVEL,
+  UPGRADE_PRICE_WEIGHT_BPS,
   upgradePriceCpt,
   upgradePriceWei,
+  upgradeTotalCpt,
   CPT_WEI,
   getRecipe,
 } from "./constants.ts";
@@ -144,25 +145,39 @@ test("rewards scale with cooldown cost and rarity", () => {
   assert.ok(rate(blackout) > rate(truffle));
 });
 
-test("upgrade prices double and cooldowns floor at 40 percent", () => {
-  assert.deepEqual(UPGRADE_LEVEL_PRICES_CPT, [5, 10, 20, 40, 80]);
-  assert.equal(upgradePriceCpt(0), 5);
-  assert.equal(upgradePriceCpt(4), 80);
-  assert.equal(upgradePriceCpt(UPGRADE_MAX_LEVEL), null);
-  assert.equal(upgradePriceWei(0), 5n * CPT_WEI);
+test("upgrade track is 40 levels with a rising price and a 20 percent floor", () => {
+  assert.equal(UPGRADE_MAX_LEVEL, 40);
+  assert.equal(UPGRADE_PRICE_WEIGHT_BPS.length, INGREDIENTS.length);
 
-  assert.equal(cooldownAtLevel(20, 0), 20);
-  assert.equal(cooldownAtLevel(20, 1), 17);
-  assert.equal(cooldownAtLevel(20, 5), 8);
-  assert.equal(cooldownAtLevel(90, 1), 79);
-  assert.equal(cooldownAtLevel(90, 5), 36);
-  assert.equal(cooldownAtLevel(90, 99), 36);
+  const expected = [
+    ["cheese", 20, 16_400, 20, 4],
+    ["pepperoni", 22, 18_040, 25, 5],
+    ["mushrooms", 24, 19_680, 30, 6],
+    ["cybertruffles", 32, 26_240, 45, 9],
+    ["neontomatoes", 26, 21_320, 35, 7],
+    ["holobasil", 30, 24_600, 50, 10],
+    ["quantumcheese", 36, 29_520, 60, 12],
+    ["nanopeppers", 40, 32_800, 75, 15],
+    ["cyberbacon", 44, 36_080, 90, 18],
+  ] as const;
 
-  const cheese = [20, 17, 15, 12, 10, 8];
-  const bacon = [90, 79, 68, 57, 46, 36];
-  for (let level = 0; level <= UPGRADE_MAX_LEVEL; level += 1) {
-    assert.equal(cooldownAtLevel(20, level), cheese[level]);
-    assert.equal(cooldownAtLevel(90, level), bacon[level]);
-    assert.ok(cooldownAtLevel(25, level) >= 1);
+  for (const [id, first, total, base, atMax] of expected) {
+    const ingredient = INGREDIENTS.find((item) => item.id === id);
+    assert.ok(ingredient);
+    assert.equal(ingredient.cooldownSeconds, base);
+    assert.equal(upgradePriceCpt(id, 0), first);
+    assert.equal(upgradePriceCpt(id, 1), first * 2);
+    assert.equal(upgradeTotalCpt(id), total);
+    assert.equal(upgradePriceCpt(id, UPGRADE_MAX_LEVEL), null);
+    assert.equal(cooldownAtLevel(base, 0), base);
+    assert.equal(cooldownAtLevel(base, UPGRADE_MAX_LEVEL), atMax);
+    assert.ok(cooldownAtLevel(base, 1) < base);
+    assert.ok(cooldownAtLevel(base, UPGRADE_MAX_LEVEL) >= Math.floor(base / 5));
   }
+
+  assert.equal(upgradePriceWei("cheese", 0), 20n * CPT_WEI);
+  assert.equal(upgradePriceWei("cyberbacon", 0), 44n * CPT_WEI);
+  assert.ok(upgradeTotalCpt("cyberbacon") > upgradeTotalCpt("cheese"));
+  assert.ok(upgradeTotalCpt("cheese") > 10_000);
+  assert.ok(upgradeTotalCpt("cyberbacon") < 50_000);
 });

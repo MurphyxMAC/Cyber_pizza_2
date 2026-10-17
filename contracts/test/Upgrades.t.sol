@@ -17,13 +17,15 @@ contract UpgradesTest is Test {
     CPTToken internal token;
     Upgrades internal upgrades;
 
+    uint256 internal constant USER_MINT = 40_000 ether;
+
     function setUp() public {
         token = new CPTToken(owner);
         upgrades = new Upgrades(address(token), treasury, owner);
 
         vm.startPrank(owner);
         token.grantRole(token.MINTER_ROLE(), owner);
-        token.mint(user, 1_000 ether);
+        token.mint(user, USER_MINT);
         token.mint(other, 5 ether);
         vm.stopPrank();
 
@@ -33,20 +35,31 @@ contract UpgradesTest is Test {
 
     function test_constantsMatchTheSharedCatalog() public view {
         assertEq(upgrades.INGREDIENT_COUNT(), 9);
-        assertEq(upgrades.MAX_LEVEL(), 5);
+        assertEq(upgrades.MAX_LEVEL(), 40);
         assertEq(upgrades.BURN_BPS(), 5_000);
-        assertEq(upgrades.priceOf(0), 5 ether);
-        assertEq(upgrades.priceOf(1), 10 ether);
-        assertEq(upgrades.priceOf(2), 20 ether);
-        assertEq(upgrades.priceOf(3), 40 ether);
-        assertEq(upgrades.priceOf(4), 80 ether);
+        assertEq(upgrades.PRICE_BASE_CPT(), 20);
+        assertEq(upgrades.PRICE_STEP_CPT(), 20);
+
+        uint16[9] memory weights =
+            [uint16(10_000), 11_000, 12_000, 16_000, 13_000, 15_000, 18_000, 20_000, 22_000];
+        for (uint8 i = 0; i < 9; ++i) {
+            assertEq(upgrades.priceWeightBps(i), weights[i]);
+            assertEq(upgrades.priceOf(i, 0), uint256(20) * weights[i] * 1 ether / 10_000);
+            assertEq(upgrades.priceOf(i, 1), uint256(40) * weights[i] * 1 ether / 10_000);
+            assertEq(upgrades.priceOf(i, 39), uint256(800) * weights[i] * 1 ether / 10_000);
+        }
+
+        assertEq(upgrades.priceOf(0, 0), 20 ether);
+        assertEq(upgrades.priceOf(0, 1), 40 ether);
+        assertEq(upgrades.priceOf(8, 0), 44 ether);
+        assertEq(upgrades.priceOf(8, 39), 1_760 ether);
     }
 
     function test_purchaseBurnsHalfAndPaysTreasury() public {
         uint256 supplyBefore = token.totalSupply();
 
         vm.expectEmit(true, true, false, true, address(upgrades));
-        emit Upgrades.Upgraded(user, 1, 1, 5 ether, 2.5 ether, 2.5 ether);
+        emit Upgrades.Upgraded(user, 1, 1, 22 ether, 11 ether, 11 ether);
 
         vm.prank(user);
         upgrades.purchase(1);
@@ -54,33 +67,37 @@ contract UpgradesTest is Test {
         assertEq(upgrades.level(user, 1), 1);
         assertEq(upgrades.level(user, 0), 0);
         assertEq(upgrades.level(other, 1), 0);
-        assertEq(token.balanceOf(user), 995 ether);
-        assertEq(token.balanceOf(treasury), 2.5 ether);
+        assertEq(token.balanceOf(user), USER_MINT - 22 ether);
+        assertEq(token.balanceOf(treasury), 11 ether);
         assertEq(token.balanceOf(address(upgrades)), 0);
-        assertEq(token.totalSupply(), supplyBefore - 2.5 ether);
-        assertEq(upgrades.nextPrice(user, 1), 10 ether);
+        assertEq(token.totalSupply(), supplyBefore - 11 ether);
+        assertEq(upgrades.nextPrice(user, 1), 44 ether);
     }
 
-    function test_priceDoublesEachLevel() public {
-        uint256[5] memory prices = [uint256(5 ether), 10 ether, 20 ether, 40 ether, 80 ether];
+    function test_priceRisesThroughFortyLevels() public {
         uint256 spent;
-        for (uint8 i = 0; i < 5; ++i) {
+        for (uint8 i = 0; i < 40; ++i) {
+            uint256 price = upgrades.priceOf(0, i);
+            assertEq(price, (20 + 20 * uint256(i)) * 1 ether);
             uint256 supply = token.totalSupply();
             vm.prank(user);
             upgrades.purchase(0);
-            spent += prices[i];
+            spent += price;
             assertEq(upgrades.level(user, 0), i + 1);
-            assertEq(token.balanceOf(user), 1_000 ether - spent);
-            assertEq(token.totalSupply(), supply - prices[i] / 2);
+            assertEq(token.balanceOf(user), USER_MINT - spent);
+            assertEq(token.totalSupply(), supply - price / 2);
         }
 
+        assertEq(spent, 16_400 ether);
         assertEq(upgrades.nextPrice(user, 0), 0);
-        assertEq(token.balanceOf(treasury), 155 ether / 2);
+        assertEq(token.balanceOf(treasury), 8_200 ether);
+
         vm.expectRevert(Upgrades.MaxLevel.selector);
         vm.prank(user);
         upgrades.purchase(0);
+
         vm.expectRevert(Upgrades.MaxLevel.selector);
-        upgrades.priceOf(5);
+        upgrades.priceOf(0, 40);
     }
 
     function test_levelsOfReturnsEveryIngredient() public {
@@ -105,6 +122,12 @@ contract UpgradesTest is Test {
 
         vm.expectRevert(Upgrades.UnknownIngredient.selector);
         upgrades.nextPrice(user, 9);
+
+        vm.expectRevert(Upgrades.UnknownIngredient.selector);
+        upgrades.priceWeightBps(9);
+
+        vm.expectRevert(Upgrades.UnknownIngredient.selector);
+        upgrades.priceOf(9, 0);
     }
 
     function test_insufficientAllowanceReverts() public {
@@ -116,7 +139,7 @@ contract UpgradesTest is Test {
                 IERC20Errors.ERC20InsufficientAllowance.selector,
                 address(upgrades),
                 1 ether,
-                5 ether
+                20 ether
             )
         );
         vm.prank(other);
@@ -131,7 +154,7 @@ contract UpgradesTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IERC20Errors.ERC20InsufficientBalance.selector, broke, 0, 5 ether
+                IERC20Errors.ERC20InsufficientBalance.selector, broke, 0, 26 ether
             )
         );
         vm.prank(broke);
@@ -181,7 +204,7 @@ contract UpgradesTest is Test {
 
         vm.prank(user);
         upgrades.purchase(2);
-        assertEq(token.balanceOf(next), 2.5 ether);
+        assertEq(token.balanceOf(next), 12 ether);
         assertEq(token.balanceOf(treasury), 0);
     }
 
@@ -198,9 +221,11 @@ contract UpgradesTest is Test {
 
     function testFuzz_onePurchaseOfAnyIngredient(uint8 ingredientId) public {
         ingredientId = ingredientId % 9;
+        uint256 price = upgrades.priceOf(ingredientId, 0);
         vm.prank(user);
         upgrades.purchase(ingredientId);
         assertEq(upgrades.level(user, ingredientId), 1);
-        assertEq(token.balanceOf(treasury), 2.5 ether);
+        assertEq(token.balanceOf(treasury), price / 2);
+        assertEq(token.balanceOf(address(upgrades)), 0);
     }
 }

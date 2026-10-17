@@ -309,8 +309,18 @@ export const upgradesAbi = [
     type: "function",
     name: "priceOf",
     stateMutability: "pure",
-    inputs: [{ name: "currentLevel", type: "uint8" }],
+    inputs: [
+      { name: "ingredientId", type: "uint8" },
+      { name: "currentLevel", type: "uint8" },
+    ],
     outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "priceWeightBps",
+    stateMutability: "pure",
+    inputs: [{ name: "ingredientId", type: "uint8" }],
+    outputs: [{ type: "uint16" }],
   },
   {
     type: "function",

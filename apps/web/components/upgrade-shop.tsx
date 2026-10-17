@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   UPGRADE_BURN_BPS,
-  UPGRADE_LEVEL_PRICES_CPT,
   UPGRADE_MAX_LEVEL,
   UPGRADE_MIN_COOLDOWN_BPS,
   UPGRADE_REDUCTION_BPS_PER_LEVEL,
+  upgradePriceCpt,
   upgradePriceWei,
+  upgradeTotalCpt,
   type IngredientId,
   type IngredientState,
 } from "@cyberpizza/shared";
@@ -17,7 +18,7 @@ function buyLabel(item: IngredientState, busy: string | null, allowance?: bigint
   if (busy === `upgrade:${item.id}:approve`) return "Approving…";
   if (busy === `upgrade:${item.id}:buy` || busy === `upgrade:${item.id}`) return "Buying…";
   if (!item.upgradePriceCpt) return "Maxed";
-  const price = upgradePriceWei(item.upgradeLevel);
+  const price = upgradePriceWei(item.id, item.upgradeLevel);
   if (price !== null && allowance !== undefined && allowance >= price) {
     return `Buy · ${item.upgradePriceCpt} CPT`;
   }
@@ -53,14 +54,14 @@ export function UpgradeShop({
           Cooldown upgrades
         </h2>
         <p className="font-mono text-xs text-pretty text-muted-foreground md:text-right">
-          Prices {UPGRADE_LEVEL_PRICES_CPT.join(" / ")} CPT
+          {UPGRADE_MAX_LEVEL} levels · {cutPercent}% of base each · {floorPercent}% floor
         </p>
       </div>
       <p className="mb-3 max-w-3xl text-sm text-pretty text-muted-foreground">
         Each level cuts {cutPercent}% of that topping&apos;s base cooldown, down to {floorPercent}% at level{" "}
-        {UPGRADE_MAX_LEVEL}. The wallet approves CPT, then <span className="font-mono">purchase</span> pulls it.
-        {burnPercent}% is burned and {keepPercent}% goes to the treasury. The booth reads your level from Fuji. It
-        ignores any level sent from the browser.
+        {UPGRADE_MAX_LEVEL}. Rarer trays cost more, and the price on the button rises every level. The wallet approves
+        CPT, then <span className="font-mono">purchase</span> pulls it. {burnPercent}% is burned and {keepPercent}% goes
+        to the treasury. The booth reads your level from Fuji. It ignores any level sent from the browser.
       </p>
       {!signedIn ? (
         <p className="mb-3 text-sm text-muted-foreground">
@@ -100,6 +101,10 @@ export function UpgradeShop({
                   <p className="font-mono text-xs text-muted-foreground">
                     {item.cooldownSeconds}s now
                     {item.nextCooldownSeconds !== null ? ` → ${item.nextCooldownSeconds}s next` : " · maxed"}
+                  </p>
+                  <p className="font-mono text-xs text-muted-foreground">
+                    First {upgradePriceCpt(item.id, 0)} CPT ·{" "}
+                    {upgradeTotalCpt(item.id).toLocaleString("en-US")} CPT to max
                   </p>
                   <Button
                     type="button"
