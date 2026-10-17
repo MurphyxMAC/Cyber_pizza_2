@@ -488,7 +488,7 @@ export function GameBoard() {
                 <Card key={item.id} className="stall-panel ring-0">
                   <CardHeader>
                     <div className="flex items-start gap-3">
-                      <ToppingArt id={item.id} name={item.name} accent={item.accent} />
+                      <ToppingArt id={item.id} accent={item.accent} />
                       <div className="min-w-0">
                         <CardTitle className="text-base">{item.name}</CardTitle>
                         <CardDescription>{item.blurb}</CardDescription>

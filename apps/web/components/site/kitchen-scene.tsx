@@ -21,9 +21,6 @@ export function KitchenScene() {
           </div>
         </div>
       </div>
-      <figcaption className="mt-4 text-center font-mono text-xs text-muted-foreground">
-        Kitchen scene at 2×. The apron reads Neon Slice.
-      </figcaption>
     </figure>
   );
 }

@@ -7,32 +7,23 @@ import type { IngredientId } from "@cyberpizza/shared";
  */
 export type ToppingArt = {
   src: string;
-  /** What the tile actually depicts. */
+  /** What the tile depicts, used as alt text. */
   tile: string;
-  /** True when the tile is the closest sheet drawing, not a literal topping. */
-  standIn: boolean;
 };
 
 export const TOPPING_ART: Partial<Record<IngredientId, ToppingArt>> = {
-  cheese: { src: "/pixel/mozzarella.png", tile: "Mozzarella", standIn: false },
-  pepperoni: { src: "/pixel/pepperoni.png", tile: "Pepperoni", standIn: false },
-  mushrooms: { src: "/pixel/mushrooms.png", tile: "Mushrooms", standIn: false },
-  neontomatoes: { src: "/pixel/tomato-sauce.png", tile: "Tomato sauce", standIn: true },
-  holobasil: { src: "/pixel/basil.png", tile: "Basil", standIn: false },
-  nanopeppers: { src: "/pixel/green-peppers.png", tile: "Green peppers", standIn: true },
+  cheese: { src: "/pixel/mozzarella.png", tile: "Mozzarella" },
+  pepperoni: { src: "/pixel/pepperoni.png", tile: "Pepperoni" },
+  mushrooms: { src: "/pixel/mushrooms.png", tile: "Mushrooms" },
+  neontomatoes: { src: "/pixel/tomato-sauce.png", tile: "Tomato sauce" },
+  holobasil: { src: "/pixel/basil.png", tile: "Basil" },
+  nanopeppers: { src: "/pixel/green-peppers.png", tile: "Green peppers" },
 };
 
-/** Sheet tiles that are not toppings in the booth. */
-export const SHEET_EXTRAS = [
-  { src: "/pixel/black-olives.png", tile: "Black olives" },
-  { src: "/pixel/red-onion.png", tile: "Red onion" },
-  { src: "/pixel/pineapple.png", tile: "Pineapple" },
-] as const;
-
 export const OVEN_TIERS = [
-  { name: "Stone hearth", blurb: "The brick deck on the left of the sheet." },
-  { name: "Neon chrome", blurb: "The cyan-trimmed deck in the middle." },
-  { name: "Plasma core", blurb: "The magenta core on the right." },
+  { name: "Stone hearth", blurb: "A brick deck." },
+  { name: "Neon chrome", blurb: "A cyan-trimmed deck." },
+  { name: "Plasma core", blurb: "A magenta core." },
 ] as const;
 
 export const CHEF_FRAMES = [

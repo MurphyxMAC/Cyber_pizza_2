@@ -4,7 +4,7 @@ import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
 import { ToppingArt } from "@/components/site/topping-art";
 import { DISCORD_URL, GITHUB_URL } from "@/lib/site";
-import { OVEN_TIERS, SHEET_EXTRAS } from "@/lib/pixel-art";
+import { OVEN_TIERS } from "@/lib/pixel-art";
 import {
   CPT_DECIMALS,
   DEFAULT_CLAIM_DEADLINE_SECONDS,
@@ -144,7 +144,7 @@ export function StreetPage() {
                   style={{ background: ingredient.accent, boxShadow: `0 0 12px ${ingredient.accent}` }}
                   aria-hidden
                 />
-                <ToppingArt id={ingredient.id} name={ingredient.name} accent={ingredient.accent} scale={2} />
+                <ToppingArt id={ingredient.id} accent={ingredient.accent} scale={2} />
                 <div className="min-w-0">
                   <h3 className="font-pixel text-sm font-bold">{ingredient.name}</h3>
                   <p className="mt-1 text-sm text-pretty text-muted-foreground">{ingredient.blurb}</p>
@@ -155,31 +155,13 @@ export function StreetPage() {
               </li>
             ))}
           </ul>
-          <div className="mt-6 stall-panel rounded-2xl p-4">
-            <p className="font-mono text-[11px] tracking-[0.22em] text-accent">SHEET NOTES</p>
-            <p className="mt-2 max-w-3xl text-sm text-pretty text-muted-foreground">
-              Cheese, pepperoni, mushrooms, and holo basil use matching tiles. Neon tomatoes use the tomato-sauce tile.
-              Nano peppers use the green-pepper tile. Cybertruffles, quantum cheese, and cyberbacon have no matching
-              tile, so those trays keep the accent dot.
-            </p>
-            <ul className="mt-4 flex flex-wrap gap-4">
-              {SHEET_EXTRAS.map((extra) => (
-                <li key={extra.tile} className="flex flex-col gap-1">
-                  <PixelImage src={extra.src} alt="" native={64} />
-                  <span className="font-mono text-[10px] tracking-wide text-muted-foreground">
-                    {extra.tile} · not a topping
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
         </Section>
 
         <Section id="ovens" kicker="Oven tiers · not live" title="Three ovens. None of them bake yet.">
           <p className="max-w-2xl text-pretty text-muted-foreground">
-            The sheet shows a stone hearth, a neon-chrome deck, and a plasma core. The idea is an upgrade where each
-            tier shortens bake time or slightly raises pending CPT. Those rates are not in the repository. The booth
-            still bakes one {RECIPE_NAME} for {PIZZA_CPT_REWARD} pending CPT, with no oven upgrade.
+            A stone hearth, a neon-chrome deck, and a plasma core. An upgrade could shorten bake time or slightly raise
+            pending CPT. That upgrade is not live. The booth still bakes one {RECIPE_NAME} for {PIZZA_CPT_REWARD}{" "}
+            pending CPT.
           </p>
           <figure className="pixel-stage mt-8">
             <div className="pixel-frame mx-auto w-fit max-w-full">
@@ -197,7 +179,6 @@ export function StreetPage() {
                 className="sm:hidden"
               />
             </div>
-            <figcaption className="sr-only">Concept art. Not a live upgrade.</figcaption>
           </figure>
           <ol className="mt-4 grid gap-3 sm:grid-cols-3">
             {OVEN_TIERS.map((tier, index) => (
@@ -220,8 +201,7 @@ export function StreetPage() {
               />
             </div>
             <p className="max-w-md text-sm text-pretty text-muted-foreground">
-              {RECIPE_NAME}, drawn as a baked pie. One of each topping. {PIZZA_CPT_REWARD} pending CPT. The picture is
-              art, not a photo of a minted claim.
+              {RECIPE_NAME}. One of each topping. {PIZZA_CPT_REWARD} pending CPT.
             </p>
           </div>
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(260px,0.9fr)]">
@@ -285,8 +265,8 @@ export function StreetPage() {
                 <li>A session secret, a signer key, or a WalletConnect Cloud project id.</li>
                 <li>Deployed contract addresses. fuji.json is still the zero address.</li>
                 <li>Player counts, a changelog, or a published roadmap.</li>
-                <li>A screenshot of a played shift. The pictures here are pixel art, not a session capture.</li>
-                <li>Oven tiers. The art is on this page. Bake time and CPT do not change with an oven.</li>
+                <li>A screenshot of a played shift.</li>
+                <li>Oven tiers. Bake time and CPT do not change with an oven.</li>
               </ul>
             </article>
           </div>
