@@ -54,8 +54,15 @@ type OpenClaimRow = {
   status: "pending";
 };
 
-function ingredientList() {
-  return getSql().array([...INGREDIENT_IDS]);
+/**
+ * Postgres text[] literal. On the first query of a connection, postgres.js
+ * binds a string array as oid 25 (text) instead of text[] (oid 1009), before
+ * its pg_type cache is applied. Postgres then looks up ensure_user(unknown, text)
+ * and returns 42883. A literal plus an explicit cast resolves on that query
+ * and on later ones.
+ */
+function ingredientArrayLiteral() {
+  return `{${INGREDIENT_IDS.map((id) => `"${id}"`).join(",")}}`;
 }
 
 export async function requireUser() {
@@ -68,7 +75,7 @@ export async function requireUser() {
 
 export async function ensureUser(address: string) {
   const sql = getSql();
-  await sql`select ensure_user(${address}, ${ingredientList()})`;
+  await sql`select ensure_user(${address}::text, ${ingredientArrayLiteral()}::text[])`;
 }
 
 function readyAt(lastCollectedAt: Date | null, cooldownSeconds: number) {
@@ -184,11 +191,11 @@ export async function collectIngredient(address: string, ingredient: IngredientI
   const sql = getSql();
   await sql`
     select * from collect_ingredient(
-      ${address},
-      ${ingredientList()},
-      ${ingredient},
-      ${meta.cap},
-      ${cooldownSeconds}
+      ${address}::text,
+      ${ingredientArrayLiteral()}::text[],
+      ${ingredient}::text,
+      ${meta.cap}::integer,
+      ${cooldownSeconds}::integer
     )
   `;
   return getGameState(address);
@@ -198,7 +205,7 @@ export async function makePizza(address: string, recipeId: RecipeId) {
   await assertMenuRecipe(recipeId);
   const sql = getSql();
   await sql`
-    select * from make_pizza(${address}, ${ingredientList()}, ${recipeId})
+    select * from make_pizza(${address}::text, ${ingredientArrayLiteral()}::text[], ${recipeId}::text)
   `;
   return getGameState(address);
 }
@@ -214,7 +221,7 @@ export async function prepareClaim(address: string) {
   const deadlineUnix = Math.floor(Date.now() / 1000) + deadlineSeconds();
   const sql = getSql();
   const [row] = await sql<ClaimRow[]>`
-    select * from prepare_claim(${address}, ${deadlineUnix})
+    select * from prepare_claim(${address}::text, ${deadlineUnix}::bigint)
   `;
   if (!row) {
     throw new GameError(500, "claim_failed", "The claim could not be prepared.");
@@ -229,7 +236,7 @@ export async function prepareClaim(address: string) {
       deadline: BigInt(row.deadline_unix),
     });
     signature = signed.signature;
-    await sql`select attach_claim_signature(${address}, ${row.claim_id}::uuid, ${signature})`;
+    await sql`select attach_claim_signature(${address}::text, ${row.claim_id}::uuid, ${signature}::text)`;
   }
 
   const state = await getGameState(address);

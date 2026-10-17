@@ -124,6 +124,141 @@ test("collect enforces cooldown and pizza claim reserves nonce once", async () =
   await db.close();
 });
 
+test("a text ingredient parameter does not resolve the text[] functions until it is cast", async () => {
+  const db = await database();
+  const literal = `{${INGREDIENTS.map((id) => `"${id}"`).join(",")}}`;
+
+  // An untyped parameter can match text[]. A parameter already typed as text,
+  // which is what postgres.js sends for a string array on a cold connection,
+  // cannot, so resolution fails until the call casts it.
+  await assert.rejects(
+    db.query("select ensure_user($1, $2::text)", [ADDRESS, literal]),
+    /function ensure_user\(unknown, text\) does not exist/,
+  );
+  await assert.rejects(
+    db.query(
+      "select amount from collect_ingredient($1, $2::text, 'cheese', 12, 20)",
+      [ADDRESS, literal],
+    ),
+    /function collect_ingredient\(.*\) does not exist/,
+  );
+  await assert.rejects(
+    db.query("select pending_cpt from make_pizza($1, $2::text, 'redline-pepperoni')", [ADDRESS, literal]),
+    /function make_pizza\(.*\) does not exist/,
+  );
+
+  const created = await db.query<{ id: string }>(
+    "select ensure_user($1::text, $2::text[])::text as id",
+    [ADDRESS, literal],
+  );
+  assert.match(created.rows[0]?.id ?? "", /^[0-9a-f-]{36}$/i);
+
+  const collected = await db.query<{ amount: number }>(
+    "select amount from collect_ingredient($1::text, $2::text[], $3::text, $4::integer, $5::integer)",
+    [ADDRESS, literal, "cheese", 12, 20],
+  );
+  assert.equal(Number(collected.rows[0]?.amount), 1);
+
+  await db.query(
+    "update inventory set amount = 4, last_collected_at = null where user_id = (select id from users where address = $1) and ingredient = 'pepperoni'",
+    [ADDRESS],
+  );
+  const baked = await db.query<{ pending_cpt: string }>(
+    "select pending_cpt::text from make_pizza($1::text, $2::text[], $3::text)",
+    [ADDRESS, literal, "redline-pepperoni"],
+  );
+  assert.equal(baked.rows[0]?.pending_cpt, "2");
+
+  await db.close();
+});
+
+test("api roles lose execute on game functions and touch_updated_at keeps a search_path", async () => {
+  const db = await database();
+  const migration = await readFile(
+    new URL("./migrations/20261017160000_revoke_api_function_execute.sql", import.meta.url),
+    "utf8",
+  );
+  await db.exec(migration);
+
+  const config = await db.query<{ proconfig: string[] | null }>(
+    `select p.proconfig
+     from pg_proc p
+     join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'touch_updated_at'`,
+  );
+  assert.ok(config.rows[0]?.proconfig?.some((item) => item.replace(/\s/g, "") === "search_path=public"));
+
+  await db.exec(`
+    create role anon nologin;
+    create role authenticated nologin;
+    grant execute on function public.ensure_user(text, text[]) to anon, authenticated;
+    grant execute on function public.collect_ingredient(text, text[], text, integer, integer) to anon, authenticated;
+    grant execute on function public.make_pizza(text, text[], text) to anon, authenticated;
+    grant execute on function public.prepare_claim(text, bigint) to anon, authenticated;
+    grant execute on function public.attach_claim_signature(text, uuid, text) to anon, authenticated;
+    grant execute on function public.confirm_claim(text, bigint, text) to anon, authenticated;
+    alter default privileges in schema public grant execute on functions to anon, authenticated;
+  `);
+  await db.exec("create function public.probe_before() returns integer language sql as $$ select 1 $$");
+
+  const before = await db.query<{ anon: boolean }>(`
+    select exists (
+      select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+      cross join lateral aclexplode(p.proacl) a
+      join pg_roles r on r.oid = a.grantee
+      where n.nspname = 'public'
+        and p.proname = 'probe_before'
+        and r.rolname = 'anon'
+        and a.privilege_type = 'EXECUTE'
+    ) as anon
+  `);
+  assert.equal(before.rows[0]?.anon, true);
+
+  await db.exec(migration);
+  await db.exec(migration);
+
+  const functions = [
+    "public.ensure_user(text, text[])",
+    "public.collect_ingredient(text, text[], text, integer, integer)",
+    "public.make_pizza(text, text[], text)",
+    "public.prepare_claim(text, bigint)",
+    "public.attach_claim_signature(text, uuid, text)",
+    "public.confirm_claim(text, bigint, text)",
+  ];
+  for (const fn of functions) {
+    const priv = await db.query<{ anon: boolean; authenticated: boolean }>(
+      "select has_function_privilege('anon', $1, 'execute') as anon, has_function_privilege('authenticated', $1, 'execute') as authenticated",
+      [fn],
+    );
+    assert.equal(priv.rows[0]?.anon, false, fn);
+    assert.equal(priv.rows[0]?.authenticated, false, fn);
+  }
+
+  await db.exec("create function public.probe_after() returns integer language sql as $$ select 1 $$");
+  const after = await db.query<{ anon: boolean; authenticated: boolean }>(`
+    select
+      coalesce(bool_or(r.rolname = 'anon'), false) as anon,
+      coalesce(bool_or(r.rolname = 'authenticated'), false) as authenticated
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    left join lateral aclexplode(p.proacl) a on true
+    left join pg_roles r on r.oid = a.grantee and a.privilege_type = 'EXECUTE'
+    where n.nspname = 'public' and p.proname = 'probe_after'
+  `);
+  assert.equal(after.rows[0]?.anon, false);
+  assert.equal(after.rows[0]?.authenticated, false);
+
+  const still = await db.query<{ id: string }>("select ensure_user($1::text, $2::text[])::text as id", [
+    ADDRESS,
+    INGREDIENTS,
+  ]);
+  assert.match(still.rows[0]?.id ?? "", /^[0-9a-f-]{36}$/i);
+
+  await db.close();
+});
+
 test("a rejected claim does not spend pending CPT", async () => {
   const db = await database();
   await db.query("select ensure_user($1, $2::text[])", [ADDRESS, INGREDIENTS]);

@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "db:migrate": "node scripts/migrate.mjs",
-    "test": "tsx --test lib/ratelimit.test.ts"
+    "test": "tsx --test lib/*.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

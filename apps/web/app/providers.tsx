@@ -1,20 +1,11 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RainbowKitProvider, darkTheme, getDefaultConfig } from "@rainbow-me/rainbowkit";
+import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 import { useState } from "react";
 import { WagmiProvider } from "wagmi";
-import { avalancheFuji } from "wagmi/chains";
 import "@rainbow-me/rainbowkit/styles.css";
-
-const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "00000000000000000000000000000000";
-
-export const wagmiConfig = getDefaultConfig({
-  appName: "CyberPizza",
-  projectId,
-  chains: [avalancheFuji],
-  ssr: true,
-});
+import { wagmiConfig } from "@/lib/wagmi";
 
 function makeQueryClient() {
   return new QueryClient({
