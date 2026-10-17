@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 
@@ -18,8 +18,12 @@ const INGREDIENTS = [
 
 async function database() {
   const db = new PGlite();
-  const sql = await readFile(new URL("./migrations/20261014180000_init.sql", import.meta.url), "utf8");
-  await db.exec(sql);
+  const directory = new URL("./migrations/", import.meta.url);
+  const files = (await readdir(directory)).filter((file) => file.endsWith(".sql")).sort();
+  for (const file of files) {
+    const sql = await readFile(new URL(`./migrations/${file}`, import.meta.url), "utf8");
+    await db.exec(sql);
+  }
   return db;
 }
 
@@ -132,5 +136,83 @@ test("a rejected claim does not spend pending CPT", async () => {
   );
   assert.equal(user.rows[0]?.pending_cpt, "5");
   assert.equal(user.rows[0]?.claim_nonce, "0");
+  await db.close();
+});
+
+test("quantity recipes spend the mapped amount and reject a short tray", async () => {
+  const db = await database();
+  await db.query("select ensure_user($1, $2::text[])", [ADDRESS, INGREDIENTS]);
+  await db.query(
+    "update inventory set amount = 4 where user_id = (select id from users where address = $1) and ingredient = 'pepperoni'",
+    [ADDRESS],
+  );
+
+  const baked = await db.query<{ pending_cpt: string; cpt_reward: string }>(
+    "select pending_cpt::text, cpt_reward::text from make_pizza($1, $2::text[], 'redline-pepperoni')",
+    [ADDRESS, INGREDIENTS],
+  );
+  assert.equal(baked.rows[0]?.pending_cpt, "2");
+  assert.equal(baked.rows[0]?.cpt_reward, "2");
+
+  const pepperoni = await db.query<{ amount: number }>(
+    "select amount from inventory where user_id = (select id from users where address = $1) and ingredient = 'pepperoni'",
+    [ADDRESS],
+  );
+  assert.equal(Number(pepperoni.rows[0]?.amount), 0);
+
+  await db.query(
+    "update inventory set amount = 3 where user_id = (select id from users where address = $1) and ingredient = 'pepperoni'",
+    [ADDRESS],
+  );
+  await assert.rejects(
+    db.query("select pending_cpt from make_pizza($1, $2::text[], 'redline-pepperoni')", [ADDRESS, INGREDIENTS]),
+    /missing ingredients/,
+  );
+  const held = await db.query<{ amount: number; pending_cpt: string }>(
+    `select i.amount, u.pending_cpt::text
+     from inventory i
+     join users u on u.id = i.user_id
+     where u.address = $1 and i.ingredient = 'pepperoni'`,
+    [ADDRESS],
+  );
+  assert.equal(Number(held.rows[0]?.amount), 3);
+  assert.equal(held.rows[0]?.pending_cpt, "2");
+
+  await db.query(
+    "update inventory set amount = 1 where user_id = (select id from users where address = $1)",
+    [ADDRESS],
+  );
+  await assert.rejects(
+    db.query("select pending_cpt from make_pizza($1, $2::text[], 'blackout-feast')", [ADDRESS, INGREDIENTS]),
+    /missing ingredients/,
+  );
+  const untouched = await db.query<{ amount: number }>(
+    "select amount from inventory where user_id = (select id from users where address = $1) and ingredient = 'cybertruffles'",
+    [ADDRESS],
+  );
+  assert.equal(Number(untouched.rows[0]?.amount), 1);
+
+  await assert.rejects(
+    db.query("select pending_cpt from make_pizza($1, $2::text[], 'not-a-pie')", [ADDRESS, INGREDIENTS]),
+    /unknown recipe/,
+  );
+
+  const menu = await db.query<{ id: string; cpt_reward: string }>(
+    "select id, cpt_reward::text from recipes order by sort_order",
+  );
+  assert.deepEqual(
+    menu.rows.map((row) => [row.id, row.cpt_reward]),
+    [
+      ["redline-pepperoni", "2"],
+      ["dockside-melt", "3"],
+      ["glitch-margherita", "4"],
+      ["coolant-funghi", "5"],
+      ["neon-supreme", "10"],
+      ["truffle-protocol", "8"],
+      ["afterburner", "12"],
+      ["blackout-feast", "16"],
+    ],
+  );
+
   await db.close();
 });

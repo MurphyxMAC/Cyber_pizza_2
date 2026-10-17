@@ -3,6 +3,7 @@ export const GITHUB_URL = "https://github.com/MurphyxMAC/Cyber_pizza_2";
 
 export const NAV_LINKS = [
   { href: "#shift", label: "Shift" },
+  { href: "#recipes", label: "Recipes" },
   { href: "#toppings", label: "Toppings" },
   { href: "#claim", label: "Claim" },
   { href: "#about", label: "About" },

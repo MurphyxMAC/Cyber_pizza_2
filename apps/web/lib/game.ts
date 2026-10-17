@@ -1,18 +1,25 @@
 import {
+  cooldownAtLevel,
   getIngredient,
   INGREDIENT_IDS,
-  RECIPE_ID,
+  ingredientIndex,
+  projectRecipe,
+  upgradePriceCpt,
+  UPGRADE_MAX_LEVEL,
   type GameState,
   type IngredientId,
   type IngredientState,
   type OpenClaim,
+  type RecipeId,
 } from "@cyberpizza/shared";
 import { getAddress, type Hex } from "viem";
 import { getContracts } from "./contracts";
 import { getSql } from "./db";
 import { GameError } from "./errors";
+import { assertMenuRecipe, loadMenu } from "./recipes";
 import { getSession } from "./session";
 import { assertSignerConfigured, signClaim } from "./signer";
+import { getUpgradeLevels } from "./upgrades";
 
 type UserRow = {
   address: string;
@@ -45,13 +52,6 @@ type OpenClaimRow = {
   deadline_unix: string | number;
   signature: string | null;
   status: "pending";
-};
-
-type RecipeRow = {
-  id: string;
-  name: string;
-  cpt_reward: string;
-  ingredients: IngredientId[];
 };
 
 function ingredientList() {
@@ -94,13 +94,19 @@ export async function getGameState(address: string): Promise<GameState> {
   `;
   const byId = new Map(inventory.map((row) => [row.ingredient, row]));
   const now = Date.now();
+  const levels = await getUpgradeLevels(address);
+  const owned: Partial<Record<IngredientId, number>> = {};
 
   const cards: IngredientState[] = INGREDIENT_IDS.map((id) => {
     const meta = getIngredient(id);
     const row = byId.get(id);
     const amount = row?.amount ?? 0;
-    const nextReady = readyAt(row?.last_collected_at ?? null, meta.cooldownSeconds);
+    owned[id] = amount;
+    const upgradeLevel = levels[ingredientIndex(id)] ?? 0;
+    const cooldownSeconds = cooldownAtLevel(meta.cooldownSeconds, upgradeLevel);
+    const nextReady = readyAt(row?.last_collected_at ?? null, cooldownSeconds);
     const cooled = !nextReady || new Date(nextReady).getTime() <= now;
+    const price = upgradePriceCpt(upgradeLevel);
     return {
       id,
       name: meta.name,
@@ -108,24 +114,20 @@ export async function getGameState(address: string): Promise<GameState> {
       accent: meta.accent,
       amount,
       cap: meta.cap,
-      cooldownSeconds: meta.cooldownSeconds,
+      cooldownSeconds,
+      baseCooldownSeconds: meta.cooldownSeconds,
+      upgradeLevel,
+      nextCooldownSeconds:
+        upgradeLevel >= UPGRADE_MAX_LEVEL ? null : cooldownAtLevel(meta.cooldownSeconds, upgradeLevel + 1),
+      upgradePriceCpt: price === null ? null : String(price),
       lastCollectedAt: row?.last_collected_at ? row.last_collected_at.toISOString() : null,
       readyAt: nextReady,
       ready: amount < meta.cap && cooled,
     };
   });
 
-  const [recipe] = await sql<RecipeRow[]>`
-    select id, name, cpt_reward::text, ingredients
-    from recipes
-    where id = ${RECIPE_ID}
-  `;
-  if (!recipe) {
-    throw new GameError(500, "recipe_missing", "The Neon Supreme recipe is not seeded.");
-  }
-
-  const required = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
-  const missing = required.filter((id) => (byId.get(id)?.amount ?? 0) < 1).map((id) => getIngredient(id).name);
+  const menu = await loadMenu();
+  const recipes = menu.map((recipe) => projectRecipe(recipe, owned));
 
   const [open] = await sql<OpenClaimRow[]>`
     select
@@ -163,24 +165,22 @@ export async function getGameState(address: string): Promise<GameState> {
     pizzasBaked: user.pizzas_baked,
     serverNow: new Date().toISOString(),
     inventory: cards,
-    recipe: {
-      id: recipe.id,
-      name: recipe.name,
-      cptReward: recipe.cpt_reward,
-      canBake: missing.length === 0,
-      missing,
-    },
+    recipes,
     openClaim,
     contracts: {
       deployed: contracts.deployed,
       cptToken: contracts.cptToken,
       pizzaRewards: contracts.pizzaRewards,
+      upgrades: contracts.upgrades,
+      upgradesDeployed: contracts.upgradesDeployed,
     },
   };
 }
 
 export async function collectIngredient(address: string, ingredient: IngredientId) {
   const meta = getIngredient(ingredient);
+  const levels = await getUpgradeLevels(address);
+  const cooldownSeconds = cooldownAtLevel(meta.cooldownSeconds, levels[ingredientIndex(ingredient)] ?? 0);
   const sql = getSql();
   await sql`
     select * from collect_ingredient(
@@ -188,16 +188,17 @@ export async function collectIngredient(address: string, ingredient: IngredientI
       ${ingredientList()},
       ${ingredient},
       ${meta.cap},
-      ${meta.cooldownSeconds}
+      ${cooldownSeconds}
     )
   `;
   return getGameState(address);
 }
 
-export async function makePizza(address: string) {
+export async function makePizza(address: string, recipeId: RecipeId) {
+  await assertMenuRecipe(recipeId);
   const sql = getSql();
   await sql`
-    select * from make_pizza(${address}, ${ingredientList()}, ${RECIPE_ID})
+    select * from make_pizza(${address}, ${ingredientList()}, ${recipeId})
   `;
   return getGameState(address);
 }

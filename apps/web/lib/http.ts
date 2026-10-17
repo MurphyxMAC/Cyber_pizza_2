@@ -5,7 +5,7 @@ import { GameError } from "./errors";
 const FRIENDLY: Record<string, string> = {
   cooldown: "That topping is still cooling down.",
   cap: "Your tray for that topping is full.",
-  "missing ingredients": "The pie needs one of every topping.",
+  "missing ingredients": "You do not have enough toppings for that recipe.",
   "nothing to claim": "No CPT is waiting to be claimed.",
   "unknown ingredient": "That topping is not on the menu.",
   "unknown recipe": "That recipe is not on the board.",

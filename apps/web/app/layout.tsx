@@ -20,11 +20,11 @@ export const metadata: Metadata = {
     template: "%s · CyberPizza",
   },
   description:
-    "Night-shift pizza kitchen on the Avalanche Fuji testnet. Collect nine toppings, bake a Neon Supreme for 10 pending CPT, and claim it as testnet CPT.",
+    "Night-shift pizza kitchen on the Avalanche Fuji testnet. Collect nine toppings, bake a recipe for pending CPT, and claim it as testnet CPT.",
   openGraph: {
     title: "CyberPizza",
     description:
-      "Night-shift pizza kitchen on the Avalanche Fuji testnet. Collect nine toppings, bake a Neon Supreme, and claim testnet CPT.",
+      "Night-shift pizza kitchen on the Avalanche Fuji testnet. Collect nine toppings, bake from the menu, and claim testnet CPT.",
     type: "website",
     locale: "en_US",
   },

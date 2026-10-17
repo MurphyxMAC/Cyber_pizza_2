@@ -12,14 +12,37 @@ export {
   INGREDIENT_IDS,
   PIZZA_CPT_REWARD,
   RECIPE_ID,
+  RECIPE_IDS,
   RECIPE_NAME,
+  RECIPES,
+  UPGRADE_BURN_BPS,
+  UPGRADE_LEVEL_CACHE_MS,
+  UPGRADE_LEVEL_PRICES_CPT,
+  UPGRADE_MAX_LEVEL,
+  UPGRADE_MIN_COOLDOWN_BPS,
+  UPGRADE_REDUCTION_BPS_PER_LEVEL,
   ZERO_ADDRESS,
+  cooldownAtLevel,
   getIngredient,
+  getRecipe,
+  ingredientIndex,
   isDeployedAddress,
   isIngredientId,
+  isRecipeId,
+  recipeCooldownCost,
+  upgradePriceCpt,
+  upgradePriceWei,
 } from "./constants";
-export type { IngredientId } from "./constants";
-export { cptTokenAbi, pizzaRewardsAbi } from "./abi";
+export type { IngredientId, RecipeDefinition, RecipeId, RecipeIngredient } from "./constants";
+export { cptTokenAbi, pizzaRewardsAbi, upgradesAbi } from "./abi";
 export { fujiDeployment, resolveAddresses } from "./addresses";
 export type { ContractAddresses } from "./addresses";
-export type { ClaimPayload, GameState, IngredientState, OpenClaim } from "./game";
+export { projectRecipe } from "./game";
+export type {
+  ClaimPayload,
+  GameState,
+  IngredientState,
+  OpenClaim,
+  RecipeIngredientState,
+  RecipeState,
+} from "./game";
