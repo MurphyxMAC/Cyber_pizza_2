@@ -9,7 +9,8 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-display), "Chakra Petch", sans-serif;
   --font-mono: var(--font-mono-face), ui-monospace, monospace;
-  --font-heading: var(--font-display), "Chakra Petch", sans-serif;
+  --font-pixel: var(--font-pixel-face), "Silkscreen", monospace;
+  --font-heading: var(--font-pixel-face), "Silkscreen", monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -246,6 +247,82 @@ html {
   transform: translateY(0);
 }
 
+.font-pixel {
+  font-synthesis: none;
+  -webkit-font-smoothing: none;
+  line-height: 1.35;
+}
+
+.pixel-art {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  -ms-interpolation-mode: nearest-neighbor;
+  max-width: none;
+}
+
+.pixel-stage {
+  position: relative;
+  z-index: 45;
+}
+
+.pixel-frame {
+  box-shadow:
+    0 0 0 4px #14081c,
+    0 0 0 8px #ff3d8a,
+    0 0 0 12px #14081c,
+    0 0 0 16px #3ef0d2;
+}
+
+.scene-frame {
+  width: 100%;
+  height: 512px;
+  overflow: hidden;
+  container-type: inline-size;
+  background: #120814;
+}
+
+.scene-stage {
+  position: relative;
+  width: 512px;
+  height: 512px;
+  left: calc((100cqi - 512px) / 2);
+}
+
+.chef-frame {
+  opacity: 0;
+  animation-name: chef-cycle;
+  animation-duration: 2.4s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.chef-frame-0 {
+  animation-delay: -2.4s;
+}
+
+.chef-frame-1 {
+  animation-delay: -1.8s;
+}
+
+.chef-frame-2 {
+  animation-delay: -1.2s;
+}
+
+.chef-frame-3 {
+  animation-delay: -0.6s;
+}
+
+@keyframes chef-cycle {
+  0%,
+  24.99% {
+    opacity: 1;
+  }
+  25%,
+  100% {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -278,5 +355,14 @@ html {
   .site-card:hover {
     transform: none;
     transition: none;
+  }
+
+  .chef-frame {
+    animation: none;
+    opacity: 0;
+  }
+
+  .chef-frame-0 {
+    opacity: 1;
   }
 }

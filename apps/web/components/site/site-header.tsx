@@ -14,7 +14,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-lg font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+          className="font-pixel inline-flex items-center gap-2 text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring sm:text-base"
         >
           <span className="size-2.5 rounded-full bg-primary shadow-[0_0_12px_var(--primary)]" aria-hidden />
           CyberPizza

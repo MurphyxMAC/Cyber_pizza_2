@@ -1,7 +1,10 @@
-import { HeroPie } from "@/components/site/hero-pie";
+import { KitchenScene } from "@/components/site/kitchen-scene";
+import { PixelImage } from "@/components/site/pixel-image";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
+import { ToppingArt } from "@/components/site/topping-art";
 import { DISCORD_URL, GITHUB_URL } from "@/lib/site";
+import { OVEN_TIERS, SHEET_EXTRAS } from "@/lib/pixel-art";
 import {
   CPT_DECIMALS,
   DEFAULT_CLAIM_DEADLINE_SECONDS,
@@ -45,16 +48,15 @@ export function StreetPage() {
     <div>
       <SiteHeader />
       <main id="content">
-        <section className="mx-auto flex min-h-[calc(100svh-4rem)] max-w-6xl items-center px-4 py-16 sm:px-6 sm:py-20">
-          <div className="grid w-full items-center gap-12 lg:grid-cols-[minmax(0,1.05fr)_minmax(280px,0.95fr)] lg:gap-8">
-            <div>
+        <section className="mx-auto grid w-full max-w-7xl items-center gap-10 overflow-x-clip px-4 py-12 sm:px-6 xl:grid-cols-[minmax(0,1fr)_512px] xl:py-16">
+            <div className="order-2 xl:order-1">
               <p className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-black/25 px-3 py-1 font-mono text-[11px] tracking-[0.22em] text-accent">
                 <span className="site-pulse size-1.5 rounded-full bg-accent" aria-hidden />
                 Fuji testnet · chain {FUJI_CHAIN_ID}
               </p>
-              <h1 className="mt-5 max-w-xl text-5xl font-semibold tracking-tight text-balance sm:text-6xl lg:text-7xl">
+              <h1 className="font-pixel mt-5 max-w-xl text-4xl font-bold text-balance sm:text-5xl">
                 Bake one neon pie.
-                <span className="mt-1 block text-primary">Mint the CPT.</span>
+                <span className="mt-2 block text-primary">Mint the CPT.</span>
               </h1>
               <p className="mt-5 max-w-xl text-lg text-pretty text-muted-foreground">
                 Collect {INGREDIENTS.length} toppings, bake a {RECIPE_NAME} for {PIZZA_CPT_REWARD} pending CPT, then
@@ -75,8 +77,9 @@ export function StreetPage() {
                 <Fact label="Network" value="Fuji" />
               </dl>
             </div>
-            <HeroPie />
-          </div>
+            <div className="order-1 xl:order-2">
+              <KitchenScene />
+            </div>
         </section>
 
         <div className="overflow-hidden border-y border-border/70" aria-hidden="true">
@@ -135,30 +138,92 @@ export function StreetPage() {
           </p>
           <ul className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {INGREDIENTS.map((ingredient) => (
-              <li key={ingredient.id} className="site-card stall-panel relative overflow-hidden rounded-2xl p-4 pl-5">
+              <li key={ingredient.id} className="site-card stall-panel relative flex gap-3 overflow-hidden rounded-2xl p-3 pl-4">
                 <span
-                  className="absolute top-4 bottom-4 left-0 w-1 rounded-full"
+                  className="absolute top-3 bottom-3 left-0 w-1"
                   style={{ background: ingredient.accent, boxShadow: `0 0 12px ${ingredient.accent}` }}
                   aria-hidden
                 />
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-base font-semibold">{ingredient.name}</h3>
-                  <span
-                    className="mt-1 size-2.5 shrink-0 rounded-full"
-                    style={{ background: ingredient.accent, boxShadow: `0 0 12px ${ingredient.accent}` }}
-                    aria-hidden
-                  />
+                <ToppingArt id={ingredient.id} name={ingredient.name} accent={ingredient.accent} scale={2} />
+                <div className="min-w-0">
+                  <h3 className="font-pixel text-sm font-bold">{ingredient.name}</h3>
+                  <p className="mt-1 text-sm text-pretty text-muted-foreground">{ingredient.blurb}</p>
+                  <p className="mt-3 font-mono text-xs tracking-wide text-muted-foreground">
+                    {ingredient.cooldownSeconds}s cooldown · cap {ingredient.cap}
+                  </p>
                 </div>
-                <p className="mt-1 text-sm text-pretty text-muted-foreground">{ingredient.blurb}</p>
-                <p className="mt-4 font-mono text-xs tracking-wide text-muted-foreground">
-                  {ingredient.cooldownSeconds}s cooldown · cap {ingredient.cap}
-                </p>
               </li>
             ))}
           </ul>
+          <div className="mt-6 stall-panel rounded-2xl p-4">
+            <p className="font-mono text-[11px] tracking-[0.22em] text-accent">SHEET NOTES</p>
+            <p className="mt-2 max-w-3xl text-sm text-pretty text-muted-foreground">
+              Cheese, pepperoni, mushrooms, and holo basil use matching tiles. Neon tomatoes use the tomato-sauce tile.
+              Nano peppers use the green-pepper tile. Cybertruffles, quantum cheese, and cyberbacon have no matching
+              tile, so those trays keep the accent dot.
+            </p>
+            <ul className="mt-4 flex flex-wrap gap-4">
+              {SHEET_EXTRAS.map((extra) => (
+                <li key={extra.tile} className="flex flex-col gap-1">
+                  <PixelImage src={extra.src} alt="" native={64} />
+                  <span className="font-mono text-[10px] tracking-wide text-muted-foreground">
+                    {extra.tile} · not a topping
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Section>
+
+        <Section id="ovens" kicker="Oven tiers · not live" title="Three ovens. None of them bake yet.">
+          <p className="max-w-2xl text-pretty text-muted-foreground">
+            The sheet shows a stone hearth, a neon-chrome deck, and a plasma core. The idea is an upgrade where each
+            tier shortens bake time or slightly raises pending CPT. Those rates are not in the repository. The booth
+            still bakes one {RECIPE_NAME} for {PIZZA_CPT_REWARD} pending CPT, with no oven upgrade.
+          </p>
+          <figure className="pixel-stage mt-8">
+            <div className="pixel-frame mx-auto w-fit max-w-full">
+              <PixelImage
+                src="/pixel/oven-tiers.png"
+                alt="Three pizza ovens side by side: a stone hearth, a neon-chrome deck, and a plasma core."
+                native={256}
+                scale={2}
+                className="hidden sm:block"
+              />
+              <PixelImage
+                src="/pixel/oven-tiers.png"
+                alt="Three pizza ovens side by side: a stone hearth, a neon-chrome deck, and a plasma core."
+                native={256}
+                className="sm:hidden"
+              />
+            </div>
+            <figcaption className="sr-only">Concept art. Not a live upgrade.</figcaption>
+          </figure>
+          <ol className="mt-4 grid gap-3 sm:grid-cols-3">
+            {OVEN_TIERS.map((tier, index) => (
+              <li key={tier.name} className="stall-panel rounded-2xl px-4 py-3">
+                <p className="font-mono text-[11px] tracking-[0.2em] text-primary">Not live · 0{index + 1}</p>
+                <h3 className="font-pixel mt-1 text-sm font-bold">{tier.name}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{tier.blurb}</p>
+              </li>
+            ))}
+          </ol>
         </Section>
 
         <Section id="claim" kicker="The claim" title="Pending CPT, then a Fuji transaction.">
+          <div className="mb-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+            <div className="pixel-stage pixel-frame">
+              <PixelImage
+                src="/pixel/pizza.png"
+                alt="Top-down Neon Supreme, a round baked pizza."
+                native={256}
+              />
+            </div>
+            <p className="max-w-md text-sm text-pretty text-muted-foreground">
+              {RECIPE_NAME}, drawn as a baked pie. One of each topping. {PIZZA_CPT_REWARD} pending CPT. The picture is
+              art, not a photo of a minted claim.
+            </p>
+          </div>
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(260px,0.9fr)]">
             <ol className="grid gap-3">
               {[
@@ -196,26 +261,6 @@ export function StreetPage() {
           </div>
         </Section>
 
-        <Section id="stills" kicker="Stills" title="No booth photos are in the repo.">
-          <div className="stall-panel rounded-3xl border border-dashed border-accent/40 p-6 sm:p-8">
-            <p className="font-mono text-[11px] tracking-[0.28em] text-accent">Placeholder · no still on file</p>
-            <p className="mt-3 max-w-2xl text-lg text-pretty">
-              Gameplay screenshots are not checked in. There is no image of the topping trays, the pass, or a confirmed mint.
-            </p>
-            <ul className="mt-5 grid gap-2 font-mono text-sm text-muted-foreground sm:grid-cols-3">
-              <li className="rounded-xl bg-black/25 px-3 py-3">Trays — not photographed</li>
-              <li className="rounded-xl bg-black/25 px-3 py-3">The pass — not photographed</li>
-              <li className="rounded-xl bg-black/25 px-3 py-3">Confirmed mint — not photographed</li>
-            </ul>
-            <p className="mt-4 max-w-2xl text-sm text-pretty text-muted-foreground">
-              The pie in the hero is the Neon Supreme graphic from the kitchen component, not a screenshot. The live booth is the kitchen page.
-            </p>
-            <Link href="/play" className={`${primaryCta} mt-6`}>
-              Open the kitchen
-            </Link>
-          </div>
-        </Section>
-
         <Section id="about" kicker="About this booth" title="Phase 0 and Phase 1, from scratch.">
           <p className="max-w-2xl text-pretty text-muted-foreground">
             This repository is a from-scratch build: Foundry contracts, Supabase-compatible Postgres, and a Next.js booth. The previous CyberPizza repo is inspiration only. A later public roadmap is not checked in.
@@ -239,7 +284,9 @@ export function StreetPage() {
                 <li>A Supabase project, a funded Fuji wallet, or a private key.</li>
                 <li>A session secret, a signer key, or a WalletConnect Cloud project id.</li>
                 <li>Deployed contract addresses. fuji.json is still the zero address.</li>
-                <li>Player counts, a changelog, screenshots, or a published roadmap.</li>
+                <li>Player counts, a changelog, or a published roadmap.</li>
+                <li>A screenshot of a played shift. The pictures here are pixel art, not a session capture.</li>
+                <li>Oven tiers. The art is on this page. Bake time and CPT do not change with an oven.</li>
               </ul>
             </article>
           </div>
@@ -289,7 +336,7 @@ function Section({
     <section id={id} aria-labelledby={headingId} className="scroll-mt-24 py-16 sm:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <p className="font-mono text-[11px] tracking-[0.32em] text-accent uppercase">{kicker}</p>
-        <h2 id={headingId} className="mt-2 max-w-3xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+        <h2 id={headingId} className="font-pixel mt-2 max-w-3xl text-2xl font-bold text-balance sm:text-3xl">
           {title}
         </h2>
         <div className="mt-4">{children}</div>

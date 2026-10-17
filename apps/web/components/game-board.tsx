@@ -3,7 +3,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PizzaMark } from "@/components/pizza-mark";
+import { PixelImage } from "@/components/site/pixel-image";
+import { ToppingArt } from "@/components/site/topping-art";
 import { wagmiConfig } from "@/app/providers";
 import {
   cptTokenAbi,
@@ -286,7 +287,21 @@ export function GameBoard() {
       : "Nothing to claim";
 
   return (
-    <div className="relative z-10 min-h-screen">
+    <div className="min-h-screen">
+      <div className="px-4 pt-4 sm:px-6">
+        <div className="pixel-stage pixel-frame mx-auto w-full max-w-[512px]">
+          <div className="relative h-40 overflow-hidden sm:h-48">
+            <PixelImage
+              src="/pixel/kitchen-bg.png"
+              alt="Night kitchen with a brick oven, a rainy window, and a neon pizza sign."
+              native={256}
+              scale={2}
+              priority
+              className="absolute top-0 left-1/2 -translate-x-1/2"
+            />
+          </div>
+        </div>
+      </div>
       <header className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-5 sm:px-6 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="font-mono text-[11px] tracking-[0.32em] text-accent">
@@ -296,7 +311,7 @@ export function GameBoard() {
             <span aria-hidden> · </span>
             AVALANCHE FUJI · 43113
           </p>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">CyberPizza</h1>
+          <h1 className="font-pixel text-3xl font-bold sm:text-4xl">CyberPizza</h1>
           <p className="max-w-xl text-sm text-muted-foreground">
             Night-shift kitchen. Scrape toppings, bake one neon pie, mint the CPT.
           </p>
@@ -345,10 +360,16 @@ export function GameBoard() {
           </p>
         ) : null}
 
-        <section className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-          <div className="stall-panel flex flex-col items-center justify-center rounded-3xl p-6">
-            <PizzaMark className="size-52 sm:size-60" />
-            <p className="mt-4 text-center font-mono text-xs tracking-wide text-muted-foreground">
+        <section className="grid gap-4 lg:grid-cols-[304px_minmax(0,1fr)]">
+          <div className="stall-panel flex flex-col items-center justify-center gap-4 rounded-3xl p-4">
+            <div className="pixel-stage">
+              <PixelImage
+                src="/pixel/pizza.png"
+                alt="Top-down Neon Supreme, a round baked pizza."
+                native={256}
+              />
+            </div>
+            <p className="text-center font-mono text-xs tracking-wide text-muted-foreground">
               Neon Supreme · nine toppings · +10 CPT
             </p>
           </div>
@@ -454,7 +475,7 @@ export function GameBoard() {
 
         <section>
           <div className="mb-3 flex items-end justify-between gap-3">
-            <h2 className="text-xl font-semibold">Topping trays</h2>
+            <h2 className="font-pixel text-lg font-bold">Topping trays</h2>
             <p className="font-mono text-xs text-muted-foreground">Server cooldown · hard cap</p>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -466,16 +487,12 @@ export function GameBoard() {
               return (
                 <Card key={item.id} className="stall-panel ring-0">
                   <CardHeader>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
+                    <div className="flex items-start gap-3">
+                      <ToppingArt id={item.id} name={item.name} accent={item.accent} />
+                      <div className="min-w-0">
                         <CardTitle className="text-base">{item.name}</CardTitle>
                         <CardDescription>{item.blurb}</CardDescription>
                       </div>
-                      <span
-                        className="mt-1 size-3 shrink-0 rounded-full"
-                        style={{ background: item.accent, boxShadow: `0 0 12px ${item.accent}` }}
-                        aria-hidden
-                      />
                     </div>
                   </CardHeader>
                   <CardContent className="flex items-center justify-between gap-3">

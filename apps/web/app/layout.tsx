@@ -1,11 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { Chakra_Petch, IBM_Plex_Mono } from "next/font/google";
+import { Chakra_Petch, IBM_Plex_Mono, Silkscreen } from "next/font/google";
 import "./globals.css";
 
 const display = Chakra_Petch({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
   variable: "--font-display",
+});
+
+const pixel = Silkscreen({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-pixel-face",
 });
 
 const mono = IBM_Plex_Mono({
@@ -41,7 +47,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`dark ${display.variable} ${mono.variable}`}>
+    <html lang="en" className={`dark ${display.variable} ${mono.variable} ${pixel.variable}`}>
       <body className="antialiased">{children}</body>
     </html>
   );
