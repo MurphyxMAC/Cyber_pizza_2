@@ -277,7 +277,7 @@ export function StreetPage() {
               <h3 className="font-mono text-[11px] tracking-[0.22em] text-primary">Not in the repository</h3>
               <ul className="mt-4 flex flex-col gap-3 text-sm text-muted-foreground">
                 <li>A Supabase project, a funded Fuji wallet, or a private key.</li>
-                <li>A session secret, a signer key, or a WalletConnect Cloud project id.</li>
+                <li>A session secret or a signer key. Browser wallets connect without a WalletConnect project id.</li>
                 <li>Deployed contract addresses. fuji.json is still the zero address.</li>
                 <li>Player counts, a changelog, screenshots, or a published roadmap.</li>
               </ul>
